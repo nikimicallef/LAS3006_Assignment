@@ -18,44 +18,44 @@ public class MessageBrokerSelector {
     }
 
     void acceptConnections() throws IOException {
-        while(true) {
-            if (selector.select() > 0) {
-                final Set<SelectionKey> selectionKeys = selector.selectedKeys();
-                final Iterator<SelectionKey> keyIterator = selectionKeys.iterator();
-                while (keyIterator.hasNext()) {
-                    final SelectionKey selectionKey = keyIterator.next();
-                    keyIterator.remove();
-                    if (selectionKey.isValid() && selectionKey.isAcceptable()) {
-                        final ServerSocketChannel serverSocketChannel = (ServerSocketChannel) selectionKey.channel();
-                        final SocketChannel clientChannel = serverSocketChannel.accept();
-                        clientChannel.configureBlocking(false);
-                        clientChannel.register(selectionKey.selector(), SelectionKey.OP_READ);
-
-                        if(TestRunner.DEBUG_MESSAGES) {
-                            System.out.println("Client has been registered with broker.");
-                        }
-                    }
-                    if (selectionKey.isValid() && selectionKey.isConnectable()) {
-                        final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
-                        socketChannel.finishConnect();
-                        selectionKey.interestOps(SelectionKey.OP_READ);
-
-                        if(TestRunner.DEBUG_MESSAGES) {
-                            System.out.println("Client registered.");
-                        }
-                    }
-                    if (selectionKey.isValid() && selectionKey.isReadable()) {
-                        // a channel is ready for reading
-                    }
-                    if (selectionKey.isValid() && selectionKey.isWritable()) {
-                        // a channel is ready for writing
-                    }
-                    if (!selectionKey.isValid()) {
-                        // the channel has become invalid (selectionkey cancelled or channel closed)
-                    }
-                }
-            }
-        }
+//        while(true) {
+//            if (selector.select() > 0) {
+//                final Set<SelectionKey> selectionKeys = selector.selectedKeys();
+//                final Iterator<SelectionKey> keyIterator = selectionKeys.iterator();
+//                while (keyIterator.hasNext()) {
+//                    final SelectionKey selectionKey = keyIterator.next();
+//                    keyIterator.remove();
+//                    if(!selectionKey.isValid()){
+//                        continue;
+//                    }
+//                    if (selectionKey.isAcceptable()) {
+//                        final ServerSocketChannel serverSocketChannel = (ServerSocketChannel) selectionKey.channel();
+//                        final SocketChannel clientChannel = serverSocketChannel.accept();
+//                        clientChannel.configureBlocking(false);
+//                        clientChannel.register(selectionKey.selector(), SelectionKey.OP_READ);
+//
+//                        if(TestRunner.DEBUG_MESSAGES) {
+//                            System.out.println("NewClient has been registered with broker.");
+//                        }
+//                    }
+//                    if (selectionKey.isConnectable()) {
+//                        final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+//                        socketChannel.finishConnect();
+//                        selectionKey.interestOps(SelectionKey.OP_READ);
+//
+//                        if(TestRunner.DEBUG_MESSAGES) {
+//                            System.out.println("NewClient registered.");
+//                        }
+//                    }
+//                    if (selectionKey.isReadable()) {
+//                        // a channel is ready for reading
+//                    }
+//                    if (selectionKey.isWritable()) {
+//                        // a channel is ready for writing
+//                    }
+//                }
+//            }
+//        }
     }
 
     /*public static void main(String[] args) throws IOException {

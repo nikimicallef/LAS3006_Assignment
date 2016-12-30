@@ -7,9 +7,9 @@ public class TestRunner {
 
     public static void main(String[] args) throws IOException {
         final MessageBrokerSelector messageBrokerSelector = new MessageBrokerSelector();
-        final Broker broker = new Broker(messageBrokerSelector.getSelector(), PORT, ADDRESS);
-        final Client client1 = new Client(PORT, ADDRESS);
-        final Client client2 = new Client(PORT, ADDRESS);
+        final Server broker = new Server(messageBrokerSelector.getSelector(), PORT, ADDRESS);
+        final Client client1 = new NewClient(PORT, ADDRESS);
+        final Client client2 = new NewClient(PORT, ADDRESS);
         messageBrokerSelector.acceptConnections();
     }
 }
