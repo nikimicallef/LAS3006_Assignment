@@ -1,18 +1,18 @@
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
-import java.util.Set;
 
 /**
  * Created by niki on 30/12/16.
  */
 public class Server {
-    private ServerSocketChannel serverSocketChannel = null;
     private Selector serverSelector = null;
+    private ServerSocketChannel serverSocketChannel = null;
 
     //private Map<SocketChannel,byte[]> dataTracking = new HashMap<SocketChannel, byte[]>();
 
@@ -21,27 +21,33 @@ public class Server {
     }
 
     private void init() {
-        if(Global.debugMessages) System.out.println("Starting server");
+        if (Global.debugMessages) System.out.println("Starting server");
 
-        if (serverSelector != null) return;
-        if (serverSocketChannel != null) return;
+        if (serverSelector != null) {
+            return;
+        }
+        if (serverSocketChannel != null) {
+            return;
+        }
 
         try {
-            serverSelector= Selector.open();
+            serverSelector = Selector.open();
             serverSocketChannel = ServerSocketChannel.open();
             serverSocketChannel.configureBlocking(false);
             serverSocketChannel.bind(new InetSocketAddress(Global.address, Global.port));
             //serverSocketChannel.socket().bind(new InetSocketAddress(Global.address, Global.port));
-            serverSocketChannel.register(serverSelector, SelectionKey.OP_ACCEPT);
+            serverSocketChannel.register(serverSelector, serverSocketChannel.validOps());
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        if(Global.debugMessages) System.out.println("Server Selector initiated.");
     }
 
-    private void connectionHandler() throws IOException {
-        if(Global.debugMessages) System.out.println("Waiting for a connections to handle.");
+    private void connectionManager() throws IOException {
+        if (Global.debugMessages) System.out.println("Server waiting for a connections to handle.");
 
-        while(true) {
+        while (true) {
             if (serverSelector.select() > 0) {
                 final Iterator<SelectionKey> keyIterator = serverSelector.selectedKeys().iterator();
 
@@ -49,12 +55,12 @@ public class Server {
                     final SelectionKey selectionKey = keyIterator.next();
                     keyIterator.remove();
 
-                    if(!selectionKey.isValid()){
+                    if (!selectionKey.isValid()) {
                         continue;
                     }
 
                     if (selectionKey.isAcceptable()) {
-                        System.out.println("Accepting a new client connection.");
+                        if(Global.debugMessages) System.out.println("Accepting a new client connection.");
                         acceptConnection(selectionKey);
                     }
 
@@ -76,11 +82,33 @@ public class Server {
         clientSocketChannel.configureBlocking(false);
         clientSocketChannel.register(selectionKey.selector(), SelectionKey.OP_READ);
 
-        if(TestRunner.DEBUG_MESSAGES) System.out.println("NewClient has been registered with broker.");
+        if (TestRunner.DEBUG_MESSAGES) System.out.println("NewClient has been registered with broker.");
+    }
+
+    /*private void write(final SelectionKey selectionKey, final S) {
+        final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+
+    }*/
+
+    private void read(final SelectionKey selectionKey) throws IOException {
+        final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+        final ByteBuffer readBuffer = ByteBuffer.allocate(1024);
+
+        try {
+            while (readBuffer.hasRemaining()) {
+                socketChannel.read(readBuffer);
+            }
+        } catch (IOException e) {
+            System.out.println("Error reading message.");
+            selectionKey.cancel();
+            socketChannel.close();
+            e.printStackTrace();
+            return;
+        }
     }
 
     public static void main(String[] args) throws IOException {
-        final Server server= new Server();
-        server.connectionHandler();
+        final Server server = new Server();
+        server.connectionManager();
     }
 }
