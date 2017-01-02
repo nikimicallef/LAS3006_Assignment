@@ -1,14 +1,12 @@
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 
-/**
- * Created by niki on 30/12/16.
- */
 public class Client {
     private Selector clientSelector = null;
     private SocketChannel clientSocketChannel = null;
@@ -30,18 +28,18 @@ public class Client {
             clientSocketChannel = SocketChannel.open();
             clientSocketChannel.configureBlocking(false);
             clientSocketChannel.register(clientSelector, SelectionKey.OP_CONNECT);
-            clientSocketChannel.connect(new InetSocketAddress(Global.address, Global.port));
+            clientSocketChannel.connect(new InetSocketAddress(GlobalProperties.address, GlobalProperties.port));
         } catch (ClosedChannelException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        if(Global.debugMessages) System.out.println("Client selector initiated.");
+        if(GlobalProperties.debugMessages) System.out.println("Client selector initiated.");
     }
 
     private void connectionManager() throws IOException {
-        if(Global.debugMessages) System.out.println("Client waiting for a connection to handle.");
+        if(GlobalProperties.debugMessages) System.out.println("Client waiting for a connection to handle.");
 
         while(true){
             if(clientSelector.select() > 0){
@@ -56,16 +54,18 @@ public class Client {
                     }
 
                     if(selectionKey.isConnectable()){
-                        if(Global.debugMessages) System.out.println("Connecting to server.");
+                        if(GlobalProperties.debugMessages) System.out.println("Accepting server connection client side.");
                         connect(selectionKey);
                     }
 
                     if(selectionKey.isReadable()) {
-                        // a channel is ready for reading
+                        if(GlobalProperties.debugMessages) System.out.println("Client is reading.");
+                        read(selectionKey);
                     }
 
                     if(selectionKey.isWritable()) {
-                        // a channel is ready for writing
+                        if(GlobalProperties.debugMessages) System.out.println("Client is writing.");
+                        write(selectionKey);
                     }
                 }
             }
@@ -81,7 +81,45 @@ public class Client {
         socketChannel.register(clientSelector, SelectionKey.OP_WRITE);
     }
 
-    public static void main(String[] args) {
+    private void write(final SelectionKey selectionKey/*, final String message*/) throws IOException {
+        final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+        socketChannel.write(ByteBuffer.wrap("Hardcoded test msg".getBytes()));
+
+        selectionKey.interestOps(SelectionKey.OP_READ);
+    }
+
+    private void read(final SelectionKey selectionKey) throws IOException {
+        final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+        final ByteBuffer readByteBuffer = ByteBuffer.allocate(1024);
+        //readByteBuffer.clear();
+        int bytesRead = 0;
+        try {
+            while (readByteBuffer.hasRemaining()) {
+                bytesRead += socketChannel.read(readByteBuffer);
+            }
+        } catch (IOException e) {
+            System.out.println("Client encountered an error reading.");
+            socketChannel.close();
+            selectionKey.cancel();
+            e.printStackTrace();
+            return;
+        }
+
+        if(bytesRead > 0 ) {
+            readByteBuffer.flip();
+
+            final byte[] dataRead = new byte[1024];
+            readByteBuffer.get(dataRead, 0, bytesRead);
+            System.out.println("Read: " + new String(dataRead));
+        } else {
+            System.out.println("Nothing read from server.");
+            socketChannel.close();
+            selectionKey.cancel();
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
         final Client client = new Client();
+        client.connectionManager();
     }
 }
