@@ -6,6 +6,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Iterator;
 
 /**
@@ -116,8 +118,8 @@ public class ClientSubscriber {
         socketChannel.write(ByteBuffer.wrap(serializedMessage));
     }
 
-    private void subscribeToPath(final CustomPath path) throws IOException {
-        if(GlobalProperties.debugMessages) System.out.println("Subscribing to path " + path.getPath());
+    private void subscribeToPath(final Path path) throws IOException {
+        if(GlobalProperties.debugMessages) System.out.println("Subscribing to path " + path.toString());
         final ClientCustomMessage clientCustomMessage = new ClientCustomMessage(ClientMessageKey.SUBSCRIBE, path);
         final byte[] serializedMessage = SerializationUtils.serialize(clientCustomMessage);
         clientSocketChannel.write(ByteBuffer.wrap(serializedMessage));
@@ -129,7 +131,7 @@ public class ClientSubscriber {
         clientSubscriber.connectionManager();
 
         //Subscribe immediately. If not then it is useless.
-        clientSubscriber.subscribeToPath(GlobalProperties.customPath);
+        clientSubscriber.subscribeToPath(Paths.get("."));
 
         while(true) {
             clientSubscriber.connectionManager();

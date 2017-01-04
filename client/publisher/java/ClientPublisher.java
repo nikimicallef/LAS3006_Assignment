@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -119,7 +120,7 @@ public class ClientPublisher {
         do {
             System.out.println("Enter an item to add");
             itemToWrite = sc.next();
-            clientPublisher.messagesToPublish.add(new ClientCustomMessage(ClientMessageKey.PUBLISH, GlobalProperties.customPath, itemToWrite));
+            clientPublisher.messagesToPublish.add(new ClientCustomMessage(ClientMessageKey.PUBLISH, itemToWrite, Paths.get(".")));
 
             final byte[] serializedMessage = SerializationUtils.serialize(clientPublisher.messagesToPublish.get(0));
             clientPublisher.messagesToPublish.remove(0);

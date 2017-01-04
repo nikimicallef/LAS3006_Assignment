@@ -1,30 +1,31 @@
 import java.io.Serializable;
+import java.nio.file.Path;
 
 /**
  * Created by niki on 03/01/17.
  */
 public class ClientCustomMessage implements Serializable{
     private ClientMessageKey clientMessageKey = null;
-    private CustomPath path = null;
     private String message = null;
+    private String path = null;
 
-    //Used for PUBLISH
-    public ClientCustomMessage(final ClientMessageKey clientMessageKey, final CustomPath path, final String message) {
+    //USED FOR PUBLISH
+    public ClientCustomMessage(final ClientMessageKey clientMessageKey, final String message, final Path path) {
         this.clientMessageKey = clientMessageKey;
-        this.path = path;
         this.message = message;
-    }
-
-    //Used for SUBSCRIBE
-    public ClientCustomMessage(final ClientMessageKey clientMessageKey, final CustomPath path) {
-        this.clientMessageKey = clientMessageKey;
-        this.path = path;
+        this.path = path.toString();
     }
 
     //USED FOR PUBREC
-    public ClientCustomMessage(ClientMessageKey clientMessageKey, String message) {
+    public ClientCustomMessage(final ClientMessageKey clientMessageKey, final String message) {
         this.clientMessageKey = clientMessageKey;
         this.message = message;
+    }
+
+    //USED FOR SUBSCRIBE
+    public ClientCustomMessage(final ClientMessageKey clientMessageKey, final Path path) {
+        this.clientMessageKey = clientMessageKey;
+        this.path = path.toString();
     }
 
     public ClientMessageKey getClientMessageKey() {
@@ -35,7 +36,7 @@ public class ClientCustomMessage implements Serializable{
         return message;
     }
 
-    public CustomPath getPath() {
+    public String getPath() {
         return path;
     }
 }

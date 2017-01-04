@@ -6,5 +6,4 @@ public class GlobalProperties {
     static final int port = 1927;
     static final boolean debugMessages = true;
     //static final List<ClientPublisher> allClientPublishers = new ArrayList<>();
-    static final CustomPath customPath = new CustomPath("testpath");
 }

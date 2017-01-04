@@ -7,13 +7,15 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 public class Server {
     private Selector serverSelector = null;
     private ServerSocketChannel serverSocketChannel = null;
 
-    private Map<CustomPath, List<SocketChannel>> listOfSubscribers = new HashMap<>();
+    private Map<Path, List<SocketChannel>> listOfSubscribers = new HashMap<>();
 
     Server() {
         init();
@@ -110,8 +112,8 @@ public class Server {
 
             sendAck(ServerMessageKey.PUBACK, socketChannel, deserializedClientMessage);
 
-            if (listOfSubscribers.get(deserializedClientMessage.getPath()) != null) {
-                listOfSubscribers.get(deserializedClientMessage.getPath()).forEach(socketChannel1 -> {
+            if (listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())) != null) {
+                listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).forEach(socketChannel1 -> {
                     try {
                         publishMessage(socketChannel1, deserializedClientMessage.getMessage());
                     } catch (IOException e) {
@@ -119,15 +121,15 @@ public class Server {
                     }
                 });
             } else {
-                System.out.println("No subscribers on path " + deserializedClientMessage.getPath().toString());
+                System.out.println("No subscribers on path " + deserializedClientMessage.getPath());
             }
         } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PUBREC) {
             System.out.println("Pubrec received for " + deserializedClientMessage.getClientMessageKey().toString());
         } else if(deserializedClientMessage.getClientMessageKey() == ClientMessageKey.SUBSCRIBE){
-            System.out.println("Subscribe to Path: " + deserializedClientMessage.getPath().getPath());
+            System.out.println("Subscribe to Path: " + deserializedClientMessage.getPath());
 
-            listOfSubscribers.putIfAbsent(deserializedClientMessage.getPath(), new ArrayList<>());
-            listOfSubscribers.get(deserializedClientMessage.getPath()).add(socketChannel);
+            listOfSubscribers.putIfAbsent(Paths.get(deserializedClientMessage.getPath()), new ArrayList<>());
+            listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).add(socketChannel);
 
             sendAck(ServerMessageKey.SUBACK, socketChannel, deserializedClientMessage);
         }
