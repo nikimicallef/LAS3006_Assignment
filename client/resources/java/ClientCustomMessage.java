@@ -8,6 +8,7 @@ public class ClientCustomMessage implements Serializable{
     private ClientMessageKey clientMessageKey = null;
     private String message = null;
     private String path = null;
+    private long clientId;
 
     //USED FOR PUBLISH
     public ClientCustomMessage(final ClientMessageKey clientMessageKey, final String message, final Path path) {
@@ -28,6 +29,12 @@ public class ClientCustomMessage implements Serializable{
         this.path = path.toString();
     }
 
+    //USED FOR CONNECT
+    public ClientCustomMessage(final ClientMessageKey clientMessageKey, final long clientId) {
+        this.clientMessageKey = clientMessageKey;
+        this.clientId = clientId;
+    }
+
     public ClientMessageKey getClientMessageKey() {
         return clientMessageKey;
     }
@@ -38,5 +45,9 @@ public class ClientCustomMessage implements Serializable{
 
     public String getPath() {
         return path;
+    }
+
+    public long getClientId() {
+        return clientId;
     }
 }

@@ -1,5 +1,3 @@
-import org.apache.commons.lang3.SerializationUtils;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -44,7 +42,7 @@ public class Server {
         if (GlobalProperties.debugMessages) System.out.println("Server Selector initiated.");
     }
 
-    private void connectionManager() throws IOException {
+    private void connectionManager() throws IOException, ClassNotFoundException {
         if (GlobalProperties.debugMessages) System.out.println("Server waiting for a connections to handle.");
 
         while (true) {
@@ -95,7 +93,7 @@ public class Server {
         selectionKey.interestOps(SelectionKey.OP_READ);
     }*/
 
-    private void read(final SelectionKey selectionKey) throws IOException {
+    private void read(final SelectionKey selectionKey) throws IOException, ClassNotFoundException {
         final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
         final ByteBuffer buffer = ByteBuffer.allocate(1024);
 
@@ -105,7 +103,7 @@ public class Server {
             throw new IllegalStateException("Failed to read!");
         }
 
-        final ClientCustomMessage deserializedClientMessage = SerializationUtils.deserialize(buffer.array());
+        final ClientCustomMessage deserializedClientMessage = (ClientCustomMessage) GlobalProperties.deserializeMessage(buffer.array());
 
         if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PUBLISH) {
             System.out.println("Data read: " + deserializedClientMessage.getMessage());
@@ -132,20 +130,26 @@ public class Server {
             listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).add(socketChannel);
 
             sendAck(ServerMessageKey.SUBACK, socketChannel, deserializedClientMessage);
+        } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.CONNECT){
+            System.out.println("Connect message received from client with id " + deserializedClientMessage.getClientId());
+
+            //TODO: Keep the client id?
+
+            sendAck(ServerMessageKey.CONNACK, socketChannel, deserializedClientMessage);
         }
     }
 
     private void sendAck(final ServerMessageKey serverMessageKey, final SocketChannel socketChannel, final ClientCustomMessage dataReceived) throws IOException {
-        final byte[] serializedMessage = SerializationUtils.serialize(new ServerCustomMessage(serverMessageKey, "Ack for" + dataReceived.getClientMessageKey().toString()));
+        final byte[] serializedMessage = GlobalProperties.serializeMessage(new ServerCustomMessage(serverMessageKey, "Ack for" + dataReceived.getClientMessageKey().toString()));
         socketChannel.write(ByteBuffer.wrap(serializedMessage));
     }
 
     private void publishMessage(final SocketChannel socketChannel, final String message) throws IOException {
-        final byte[] serializedMessage = SerializationUtils.serialize(new ServerCustomMessage(ServerMessageKey.PUBLISH, "Publishing " + message));
+        final byte[] serializedMessage = GlobalProperties.serializeMessage(new ServerCustomMessage(ServerMessageKey.PUBLISH, "Publishing " + message));
         socketChannel.write(ByteBuffer.wrap(serializedMessage));
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, ClassNotFoundException {
         final Server server = new Server();
         server.connectionManager();
     }

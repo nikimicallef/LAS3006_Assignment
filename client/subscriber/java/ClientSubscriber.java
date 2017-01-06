@@ -1,139 +1,77 @@
-import org.apache.commons.lang3.SerializationUtils;
-
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.SocketChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Iterator;
 
 /**
  * Created by niki on 03/01/17.
  */
-public class ClientSubscriber {
-    private Selector clientSelector = null;
-    private SocketChannel clientSocketChannel = null;
-
+public class ClientSubscriber extends Client {
     ClientSubscriber() {
-        init();
+        super();
     }
 
-    private void init() {
-        if (clientSelector != null) {
-            return;
-        }
-        if (clientSocketChannel != null) {
-            return;
-        }
-
-        try {
-            clientSelector = Selector.open();
-            clientSocketChannel = SocketChannel.open();
-            clientSocketChannel.configureBlocking(false);
-            clientSocketChannel.register(clientSelector, SelectionKey.OP_CONNECT);
-            clientSocketChannel.connect(new InetSocketAddress(GlobalProperties.address, GlobalProperties.port));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        if (GlobalProperties.debugMessages) System.out.println("ClientSubscriber selector initiated.");
-    }
-
-    private void connectionManager() throws IOException {
-        //if(clientSelector.selectedKeys().size() > 0){
-        if (clientSelector.select() > 0) {
-            final Iterator<SelectionKey> keyIterator = clientSelector.selectedKeys().iterator();
-
-            while (keyIterator.hasNext()) {
-                final SelectionKey selectionKey = keyIterator.next();
-                keyIterator.remove();
-
-                if (!selectionKey.isValid()) {
-                    continue;
-                }
-
-                if (selectionKey.isConnectable()) {
-                    if (GlobalProperties.debugMessages) System.out.println("Creating connection to server.");
-                    connect(selectionKey);
-                }
-
-                if (selectionKey.isReadable()) {
-                    if (GlobalProperties.debugMessages) System.out.println("ClientPublisher is reading.");
-                    read(selectionKey);
-                }
-
-                    /*if(selectionKey.isWritable()) {
-                        if(GlobalProperties.debugMessages) System.out.println("ClientPublisher is writing.");
-                        write(selectionKey);
-                    }*/
-            }
-        }
-        //}
-    }
-
-    private void connect(final SelectionKey selectionKey) throws IOException {
-        final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
-        if (socketChannel.isConnectionPending()) {
-            socketChannel.finishConnect();
-        }
-        socketChannel.configureBlocking(false);
-        socketChannel.register(clientSelector, SelectionKey.OP_READ);
-    }
-
-    /*private void write(final SelectionKey selectionKey) throws IOException {
-        if(messagesToPublish.size() > 0){
-            final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
-            socketChannel.write(ByteBuffer.wrap(messagesToPublish.get(0).getBytes()));
-            messagesToPublish.remove(0);
-            //selectionKey.interestOps(SelectionKey.OP_READ);
-        }
-    }*/
-
-    private void read(final SelectionKey selectionKey) throws IOException {
-        final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+    void read() throws IOException, ClassNotFoundException {
+        //final SocketChannel socketChannel = (SocketChannel) getSelectionKey().channel();
 
         final ByteBuffer buffer = ByteBuffer.allocate(1024);
 
         try {
-            socketChannel.read(buffer);
+            getClientSocketChannel().read(buffer);
         } catch (final IOException e) {
             throw new IllegalStateException("Failed to read!");
         }
 
-        final ServerCustomMessage deserializedServerMessage = SerializationUtils.deserialize(buffer.array());
+        final ServerCustomMessage deserializedServerMessage = (ServerCustomMessage) GlobalProperties.deserializeMessage(buffer.array());
 
         if(deserializedServerMessage.getServerMessageKey() == ServerMessageKey.SUBACK){
             System.out.println("Subscribe acknowledgement received.");
         }else if(deserializedServerMessage.getServerMessageKey() == ServerMessageKey.PUBLISH){
             System.out.println("Data received: " + deserializedServerMessage.getMessage());
-            sendAck(ClientMessageKey.PUBREC, socketChannel, deserializedServerMessage);
+            prepareAckForWrite(ClientMessageKey.PUBREC, deserializedServerMessage);
+        } else if(deserializedServerMessage.getServerMessageKey() == ServerMessageKey.CONNACK) {
+            System.out.println("CONNACK received");
+            this.setConnected(true);
         }
     }
 
-    private void sendAck(final ClientMessageKey clientMessageKey, final SocketChannel socketChannel, final ServerCustomMessage dataReceived) throws IOException {
-        final byte[] serializedMessage = SerializationUtils.serialize(new ClientCustomMessage(clientMessageKey, "Ack for " + dataReceived.getServerMessageKey().toString()));
-        socketChannel.write(ByteBuffer.wrap(serializedMessage));
+    private void prepareAckForWrite(final ClientMessageKey clientMessageKey, final ServerCustomMessage dataReceived) throws IOException {
+        if(this.isConnected()) {
+            getMessagesToSend().add(new ClientCustomMessage(clientMessageKey, "Ack for " + dataReceived.getServerMessageKey().toString()));
+            getSelectionKey().interestOps(SelectionKey.OP_WRITE);
+        } else {
+            System.out.println("Client is not connected yet and thus it can't write.");
+        }
     }
 
-    private void subscribeToPath(final Path path) throws IOException {
-        if(GlobalProperties.debugMessages) System.out.println("Subscribing to path " + path.toString());
-        final ClientCustomMessage clientCustomMessage = new ClientCustomMessage(ClientMessageKey.SUBSCRIBE, path);
-        final byte[] serializedMessage = SerializationUtils.serialize(clientCustomMessage);
-        clientSocketChannel.write(ByteBuffer.wrap(serializedMessage));
+    private void prepareSubscribeToPath(final Path path) throws IOException {
+        if(this.isConnected()) {
+            if (GlobalProperties.debugMessages) System.out.println("Subscribing to path " + path.toString());
+
+            final ClientCustomMessage clientCustomMessage = new ClientCustomMessage(ClientMessageKey.SUBSCRIBE, path);
+
+            this.getMessagesToSend().add(clientCustomMessage);
+            getSelectionKey().interestOps(SelectionKey.OP_WRITE);
+        } else {
+            System.out.println("Client is not connected yet and thus it can't write.");
+        }
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, ClassNotFoundException {
         final ClientSubscriber clientSubscriber = new ClientSubscriber();
-        //for isConnectable
+        //For isConnectable + Prepare connect msg
+        clientSubscriber.connectionManager();
+        //Send connect msg
+        clientSubscriber.connectionManager();
+        //Receive connack
         clientSubscriber.connectionManager();
 
-        //Subscribe immediately. If not then it is useless.
-        clientSubscriber.subscribeToPath(Paths.get("."));
+        System.out.println("Subscribe to path .");
+        clientSubscriber.prepareSubscribeToPath(Paths.get("."));
 
         while(true) {
+            clientSubscriber.getSelectionKey().interestOps(SelectionKey.OP_READ);
             clientSubscriber.connectionManager();
         }
     }
