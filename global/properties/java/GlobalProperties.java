@@ -7,7 +7,6 @@ public class GlobalProperties {
     static final String address = "localhost";
     static final int port = 1927;
     static final boolean debugMessages = true;
-    //static final List<ClientPublisher> allClientPublishers = new ArrayList<>();
 
     static byte[] serializeMessage(final Object customMessage) throws IOException {
         try (final ByteArrayOutputStream byteArrayOutputStream= new ByteArrayOutputStream();

@@ -27,6 +27,7 @@ public class ClientSubscriber extends Client {
 
         if(deserializedServerMessage.getServerMessageKey() == ServerMessageKey.SUBACK){
             System.out.println("Subscribe acknowledgement received.");
+            getSelectionKey().interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
         }else if(deserializedServerMessage.getServerMessageKey() == ServerMessageKey.PUBLISH){
             System.out.println("Data received: " + deserializedServerMessage.getMessage());
             prepareAckForWrite(ClientMessageKey.PUBREC, deserializedServerMessage);
@@ -47,11 +48,7 @@ public class ClientSubscriber extends Client {
 
     private void prepareSubscribeToPath(final Path path) throws IOException {
         if(this.isConnected()) {
-            if (GlobalProperties.debugMessages) System.out.println("Subscribing to path " + path.toString());
-
-            final ClientCustomMessage clientCustomMessage = new ClientCustomMessage(ClientMessageKey.SUBSCRIBE, path);
-
-            this.getMessagesToSend().add(clientCustomMessage);
+            this.getMessagesToSend().add(new ClientCustomMessage(ClientMessageKey.SUBSCRIBE, path));
             getSelectionKey().interestOps(SelectionKey.OP_WRITE);
         } else {
             System.out.println("Client is not connected yet and thus it can't write.");
@@ -67,11 +64,10 @@ public class ClientSubscriber extends Client {
         //Receive connack
         clientSubscriber.connectionManager();
 
-        System.out.println("Subscribe to path .");
+        //System.out.println("Subscribe to path .");
         clientSubscriber.prepareSubscribeToPath(Paths.get("."));
 
         while(true) {
-            clientSubscriber.getSelectionKey().interestOps(SelectionKey.OP_READ);
             clientSubscriber.connectionManager();
         }
     }

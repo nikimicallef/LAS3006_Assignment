@@ -82,7 +82,9 @@ public abstract class Client {
                 selectionKey = clientSelector.selectedKeys().iterator().next();
             }
 
-            if (selectionKey.isConnectable()) {
+            if (!selectionKey.isValid()) {
+                System.out.println("Selection key is not valid. " + selectionKey.toString());
+            } else if (selectionKey.isConnectable()) {
                 if (GlobalProperties.debugMessages) System.out.println("Creating connection to server.");
                 connect();
                 prepareConnectMessage();
@@ -92,18 +94,20 @@ public abstract class Client {
             } else if (selectionKey.isWritable()) {
                 if (GlobalProperties.debugMessages) System.out.println("Client is writing.");
                 write();
-            } else if (!selectionKey.isValid()) {
-                System.out.println("Selection key is not valid. " + selectionKey.toString());
             }
         }
     }
 
     private void prepareConnectMessage() throws IOException {
-        final ClientCustomMessage clientCustomMessage = new ClientCustomMessage(ClientMessageKey.CONNECT, clientSubscriberId);
+        if(!isConnected()) {
+            final ClientCustomMessage clientCustomMessage = new ClientCustomMessage(ClientMessageKey.CONNECT, clientSubscriberId);
 
-        messagesToSend.add(clientCustomMessage);
+            messagesToSend.add(clientCustomMessage);
 
-        selectionKey.interestOps(SelectionKey.OP_WRITE);
+            selectionKey.interestOps(SelectionKey.OP_WRITE);
+        } else {
+            System.out.println("Already connected.");
+        }
     }
 
     private void connect() throws IOException {
@@ -112,6 +116,7 @@ public abstract class Client {
         }
         clientSocketChannel.configureBlocking(false);
         selectionKey.interestOps(SelectionKey.OP_READ);
+        System.out.println("channel is " + selectionKey.channel().toString());
     }
 
     abstract void read() throws IOException, ClassNotFoundException;
@@ -127,6 +132,6 @@ public abstract class Client {
             System.out.println("No messages to write. Going back to read.");
         }
 
-        this.selectionKey.interestOps(SelectionKey.OP_READ);
+        selectionKey.interestOps(SelectionKey.OP_READ);
     }
 }
