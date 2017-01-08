@@ -6,7 +6,6 @@ import java.io.*;
 public class GlobalProperties {
     static final String address = "localhost";
     static final int port = 1927;
-    static final boolean debugMessages = true;
 
     static byte[] serializeMessage(final Object customMessage) throws IOException {
         try (final ByteArrayOutputStream byteArrayOutputStream= new ByteArrayOutputStream();

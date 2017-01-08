@@ -65,8 +65,6 @@ public abstract class Client {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        if (GlobalProperties.debugMessages) System.out.println("Client selector initiated.");
     }
 
 
@@ -85,14 +83,11 @@ public abstract class Client {
             if (!selectionKey.isValid()) {
                 System.out.println("Selection key is not valid. " + selectionKey.toString());
             } else if (selectionKey.isConnectable()) {
-                if (GlobalProperties.debugMessages) System.out.println("Creating connection to server.");
                 connect();
                 prepareConnectMessage();
             } else if (selectionKey.isReadable()) {
-                if (GlobalProperties.debugMessages) System.out.println("Client is reading.");
                 read();
             } else if (selectionKey.isWritable()) {
-                if (GlobalProperties.debugMessages) System.out.println("Client is writing.");
                 write();
             }
         }

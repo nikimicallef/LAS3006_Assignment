@@ -3,6 +3,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Scanner;
 
 /**
  * Created by niki on 03/01/17.
@@ -34,6 +35,9 @@ public class ClientSubscriber extends Client {
         } else if(deserializedServerMessage.getServerMessageKey() == ServerMessageKey.CONNACK) {
             System.out.println("CONNACK received");
             this.setConnected(true);
+        } else if(deserializedServerMessage.getServerMessageKey() == ServerMessageKey.UNSUBACK) {
+            System.out.println("Unsubscribe acknowledgement received.");
+            getSelectionKey().interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
         }
     }
 
@@ -55,6 +59,15 @@ public class ClientSubscriber extends Client {
         }
     }
 
+    private void prepareUnsubFromPath(final Path path) throws IOException {
+        if(this.isConnected()) {
+            this.getMessagesToSend().add(new ClientCustomMessage(ClientMessageKey.UNSUBSCRIBE, path));
+            getSelectionKey().interestOps(SelectionKey.OP_WRITE);
+        } else {
+            System.out.println("Client is not connected yet and thus it can't write.");
+        }
+    }
+
     public static void main(String[] args) throws IOException, ClassNotFoundException {
         final ClientSubscriber clientSubscriber = new ClientSubscriber();
         //For isConnectable + Prepare connect msg
@@ -67,8 +80,23 @@ public class ClientSubscriber extends Client {
         //System.out.println("Subscribe to path .");
         clientSubscriber.prepareSubscribeToPath(Paths.get("."));
 
+        //Ack write
+        clientSubscriber.connectionManager();
+
+        //Suback
+        clientSubscriber.connectionManager();
+
+        final Scanner sc = new Scanner(System.in);
+
         while(true) {
-            clientSubscriber.connectionManager();
+            /*System.out.println("Press 1 for unsubscribe. Press 2 for reading.");
+            final int choice = sc.nextInt();
+            if(choice == 1){
+                clientSubscriber.prepareUnsubFromPath(Paths.get("."));
+            } else {*/
+                //clientSubscriber.getSelectionKey().interestOps(SelectionKey.OP_READ);
+                clientSubscriber.connectionManager();
+            //}
         }
     }
 }
