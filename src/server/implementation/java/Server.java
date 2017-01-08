@@ -92,7 +92,7 @@ public class Server {
 
         messagesToRemove.forEach(messagesToSend::remove);
 
-        selectionKey.interestOps(SelectionKey.OP_READ);
+        selectionKey.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
     }
 
     private void read(final SelectionKey selectionKey) throws IOException, ClassNotFoundException {
@@ -128,6 +128,8 @@ public class Server {
             if (pathValid) {
                 listOfSubscribers.putIfAbsent(Paths.get(deserializedClientMessage.getPath()), new ArrayList<>());
                 listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).add(selectionKey);
+            } else {
+                System.out.println("Path " + deserializedClientMessage.getPath() + " is not valid.");
             }
 
             prepareAckMessage(ServerMessageKey.SUBACK, selectionKey);
@@ -139,12 +141,29 @@ public class Server {
             prepareAckMessage(ServerMessageKey.CONNACK, selectionKey);
         } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.UNSUBSCRIBE) {
             if (listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())) != null) {
-                listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).remove(selectionKey);
+                if (listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).remove(selectionKey)) {
+                    System.out.println("SelectionKey " + selectionKey.channel() + " is not subscribed to " + deserializedClientMessage.getPath());
+                }
             } else {
                 System.out.println("No subscribers on path " + deserializedClientMessage.getPath());
             }
 
             prepareAckMessage(ServerMessageKey.UNSUBACK, selectionKey);
+        } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PINGREQ) {
+            System.out.println("Pingreq received from " + deserializedClientMessage.getMessageId());
+
+            prepareAckMessage(ServerMessageKey.PINGRESP, selectionKey);
+        } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.DISCONNECT) {
+            System.out.println("Disconnect received.");
+
+            listOfSubscribers.keySet().forEach(path -> {
+                final List<SelectionKey> selectionKeyList = listOfSubscribers.get(path);
+                selectionKeyList.remove(selectionKey);
+            });
+
+            selectionKey.channel().close();
+            ((SocketChannel) selectionKey.channel()).socket().close();
+            selectionKey.cancel();
         }
     }
 
@@ -158,7 +177,7 @@ public class Server {
             if (pathInHashMapSplit[counter].equals("#") || (inputtedPathSplit.length > counter && inputtedPathSplit[counter].equals("#"))) {
                 return true;
             } else if (pathInHashMapSplit[counter].equals("+") || ((inputtedPathSplit.length > counter && inputtedPathSplit[counter].equals("+")))) {
-
+                continue;
             } else if (inputtedPathSplit.length > counter && !pathInHashMapSplit[counter].equals(inputtedPathSplit[counter])) {
                 return false;
             }

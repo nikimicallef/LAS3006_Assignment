@@ -1,14 +1,12 @@
 import java.io.Serializable;
 import java.nio.file.Path;
 
-/**
- * Created by niki on 03/01/17.
- */
 public class ClientCustomMessage implements Serializable{
     private ClientMessageKey clientMessageKey = null;
     private String message = null;
     private String path = null;
     private long clientId;
+    private int messageId;
 
     //USED FOR PUBLISH
     public ClientCustomMessage(final ClientMessageKey clientMessageKey, final String message, final Path path) {
@@ -35,6 +33,18 @@ public class ClientCustomMessage implements Serializable{
         this.clientId = clientId;
     }
 
+    //USED FOR PING
+    public ClientCustomMessage(final ClientMessageKey clientMessageKey, final int messageId) {
+        this.clientMessageKey = clientMessageKey;
+        this.messageId = messageId;
+    }
+
+    //USED FOR DISCONNECT
+    public ClientCustomMessage(final ClientMessageKey clientMessageKey) {
+        this.clientMessageKey = clientMessageKey;
+        this.messageId = messageId;
+    }
+
     public ClientMessageKey getClientMessageKey() {
         return clientMessageKey;
     }
@@ -49,5 +59,9 @@ public class ClientCustomMessage implements Serializable{
 
     public long getClientId() {
         return clientId;
+    }
+
+    public int getMessageId() {
+        return messageId;
     }
 }

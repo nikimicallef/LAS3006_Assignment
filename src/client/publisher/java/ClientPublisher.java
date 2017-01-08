@@ -25,6 +25,10 @@ public class ClientPublisher extends Client{
         } else if(deserializedServerMessage.getServerMessageKey() == ServerMessageKey.CONNACK) {
             System.out.println("CONNACK received: " + deserializedServerMessage.getMessage());
             this.setConnected(true);
+        } else if (deserializedServerMessage.getServerMessageKey() == ServerMessageKey.PINGRESP) {
+            System.out.println("PINGRESP Received: " + deserializedServerMessage.getMessage());
+        } else {
+            System.out.println("INVALID MESSAGE! Key " + deserializedServerMessage.getServerMessageKey());
         }
     }
 
@@ -40,17 +44,34 @@ public class ClientPublisher extends Client{
         final Scanner sc = new Scanner(System.in);
 
         String itemToWrite;
-        do {
-            System.out.println("Enter an item to add");
-            itemToWrite = sc.next();
-            clientPublisher.getMessagesToSend().add(new ClientCustomMessage(ClientMessageKey.PUBLISH, itemToWrite, Paths.get(".")));
-            clientPublisher.getSelectionKey().interestOps(SelectionKey.OP_WRITE);
+        while(clientPublisher.isConnected()){
+            System.out.println("1 = Publish. 2 = Ping. 3 = Disconnect");
+            final int choice = sc.nextInt();
+            if(choice == 1) {
+                System.out.println("Enter an item to add");
+                itemToWrite = sc.next();
+                clientPublisher.getMessagesToSend().add(new ClientCustomMessage(ClientMessageKey.PUBLISH, itemToWrite, Paths.get(".")));
+                clientPublisher.getSelectionKey().interestOps(SelectionKey.OP_WRITE);
 
-            //You write.
-            clientPublisher.connectionManager();
+                //You write.
+                clientPublisher.connectionManager();
 
-            //You read the ack.
-            clientPublisher.connectionManager();
-        } while (!itemToWrite.equalsIgnoreCase("quit") && clientPublisher.isConnected());
+                //You read the ack.
+                clientPublisher.connectionManager();
+            } else if (choice == 2){
+                clientPublisher.preparePingMessage();
+
+                //You write.
+                clientPublisher.connectionManager();
+
+                //You read the ack.
+                clientPublisher.connectionManager();
+            } else if (choice == 3){
+                clientPublisher.prepareDisconnectMessage();
+
+                //write and dc
+                clientPublisher.connectionManager();
+            }
+        }
     }
 }

@@ -5,7 +5,9 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Created by niki on 05/01/17.
@@ -69,6 +71,10 @@ public abstract class Client {
 
 
     void connectionManager() throws IOException, ClassNotFoundException {
+        if(selectionKey != null){
+            System.out.println("1= read. 4 = write. 5 = read|write. InterestOps: " + selectionKey.interestOps());
+        }
+
         if (clientSelector.select() > 0) {
             if (clientSelector.selectedKeys().size() > 1) {
                 throw new IllegalArgumentException("This selector has more than one selection key! VIOLATION OBSERVED!");
@@ -80,15 +86,22 @@ public abstract class Client {
                 selectionKey = clientSelector.selectedKeys().iterator().next();
             }
 
-            if (!selectionKey.isValid()) {
-                System.out.println("Selection key is not valid. " + selectionKey.toString());
-            } else if (selectionKey.isConnectable()) {
-                connect();
-                prepareConnectMessage();
-            } else if (selectionKey.isReadable()) {
-                read();
-            } else if (selectionKey.isWritable()) {
-                write();
+            final Iterator<SelectionKey> keyIterator = clientSelector.selectedKeys().iterator();
+
+            while (keyIterator.hasNext()) {
+                final SelectionKey selectionKey = keyIterator.next();
+                keyIterator.remove();
+
+                if (!selectionKey.isValid()) {
+                    System.out.println("Selection key is not valid. " + selectionKey.toString());
+                } else if (selectionKey.isConnectable()) {
+                    connect();
+                    prepareConnectMessage();
+                } else if (selectionKey.isReadable()) {
+                    read();
+                } else if (selectionKey.isWritable()) {
+                    write();
+                }
             }
         }
     }
@@ -117,8 +130,12 @@ public abstract class Client {
     abstract void read() throws IOException, ClassNotFoundException;
 
     private void write() throws IOException {
+        boolean disconnect = false;
         if (messagesToSend.size() > 0) {
             do {
+                if(messagesToSend.get(0).getClientMessageKey() == ClientMessageKey.DISCONNECT){
+                    disconnect = true;
+                }
                 final byte[] serializedMessage = GlobalProperties.serializeMessage(messagesToSend.get(0));
                 messagesToSend.remove(0);
                 clientSocketChannel.write(ByteBuffer.wrap(serializedMessage));
@@ -127,6 +144,47 @@ public abstract class Client {
             System.out.println("No messages to write. Going back to read.");
         }
 
-        selectionKey.interestOps(SelectionKey.OP_READ);
+        if(disconnect){
+            disconnectClient();
+        } else {
+            selectionKey.interestOps(SelectionKey.OP_READ);
+        }
+    }
+
+    void preparePingMessage() {
+        if(isConnected()){
+            final ClientCustomMessage clientCustomMessage = new ClientCustomMessage(ClientMessageKey.PINGREQ, new Random().nextInt(999));
+
+            messagesToSend.add(clientCustomMessage);
+
+            selectionKey.interestOps(SelectionKey.OP_WRITE);
+        } else {
+            System.out.println("Need to be connected to send a ping request..");
+        }
+    }
+
+    void prepareDisconnectMessage() {
+        if(isConnected()){
+            final ClientCustomMessage clientCustomMessage = new ClientCustomMessage(ClientMessageKey.DISCONNECT);
+
+            messagesToSend.add(clientCustomMessage);
+
+            selectionKey.interestOps(SelectionKey.OP_WRITE);
+        } else {
+            System.out.println("Need to be connected to send a disconnect request..");
+        }
+    }
+
+    private void disconnectClient() throws IOException {
+        if(isConnected()){
+            clientSelector.close();
+            clientSocketChannel.socket().close();
+            clientSocketChannel.close();
+            selectionKey.cancel();
+
+            setConnected(false);
+        } else {
+            System.out.println("Client is not connected so it can't be disconnected.");
+        }
     }
 }
