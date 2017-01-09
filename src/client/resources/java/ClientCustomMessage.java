@@ -21,7 +21,7 @@ public class ClientCustomMessage implements Serializable{
         this.message = message;
     }
 
-    //USED FOR SUBSCRIBE
+    //USED FOR SUBSCRIBE, UNSUBSCRIBE
     public ClientCustomMessage(final ClientMessageKey clientMessageKey, final Path path) {
         this.clientMessageKey = clientMessageKey;
         this.path = path.toString();
@@ -42,7 +42,6 @@ public class ClientCustomMessage implements Serializable{
     //USED FOR DISCONNECT
     public ClientCustomMessage(final ClientMessageKey clientMessageKey) {
         this.clientMessageKey = clientMessageKey;
-        this.messageId = messageId;
     }
 
     public ClientMessageKey getClientMessageKey() {

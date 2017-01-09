@@ -127,7 +127,9 @@ public class Server {
 
             if (pathValid) {
                 listOfSubscribers.putIfAbsent(Paths.get(deserializedClientMessage.getPath()), new ArrayList<>());
-                listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).add(selectionKey);
+                if(!listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).contains(selectionKey)){
+                    listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).add(selectionKey);
+                }
             } else {
                 System.out.println("Path " + deserializedClientMessage.getPath() + " is not valid.");
             }

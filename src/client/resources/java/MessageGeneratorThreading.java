@@ -1,0 +1,28 @@
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Created by niki on 09/01/17.
+ */
+public class MessageGeneratorThreading {
+    private final ScheduledExecutorService scheduledExecutorService;
+    private final MessageGenerator messageGenerator;
+
+    public MessageGeneratorThreading(final MessageGenerator messageGenerator) {
+        this.messageGenerator = messageGenerator;
+        scheduledExecutorService = new ScheduledThreadPoolExecutor(1);
+        scheduledExecutorService.scheduleWithFixedDelay(messageGenerator,
+                0,
+                messageGenerator.getWaitTimeSeconds(),
+                TimeUnit.SECONDS);
+    }
+
+    public MessageGenerator getMessageGenerator() {
+        return messageGenerator;
+    }
+
+    public void shutdown() {
+        scheduledExecutorService.shutdownNow();
+    }
+}
