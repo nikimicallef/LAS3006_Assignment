@@ -23,6 +23,10 @@ public class SubscriberMessageGenerator extends MessageGenerator {
         } else if (clientMessageKey == ClientMessageKey.UNSUBSCRIBE){
             return new ClientCustomMessage(ClientMessageKey.UNSUBSCRIBE, Paths.get(generateSubscribePath()));
         }
-        return new ClientCustomMessage(ClientMessageKey.DISCONNECT);
+        if(secureRandom.nextInt(10) == 0) {
+            return new ClientCustomMessage(ClientMessageKey.DISCONNECT);
+        } else {
+            return generate();
+        }
     }
 }

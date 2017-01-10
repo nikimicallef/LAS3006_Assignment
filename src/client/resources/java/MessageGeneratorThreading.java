@@ -14,7 +14,7 @@ public class MessageGeneratorThreading {
         scheduledExecutorService = new ScheduledThreadPoolExecutor(1);
         scheduledExecutorService.scheduleWithFixedDelay(messageGenerator,
                 0,
-                messageGenerator.getWaitTimeSeconds(),
+                messageGenerator.getPollingRateSeconds(),
                 TimeUnit.SECONDS);
     }
 

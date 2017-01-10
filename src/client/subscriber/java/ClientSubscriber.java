@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.io.StreamCorruptedException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 
@@ -9,14 +10,11 @@ public class ClientSubscriber extends Client {
 
     void read() throws IOException, ClassNotFoundException {
         final ByteBuffer buffer = ByteBuffer.allocate(1024);
+        final ServerCustomMessage deserializedServerMessage;
 
-        try {
-            getClientSocketChannel().read(buffer);
-        } catch (final IOException e) {
-            throw new IllegalStateException("Failed to read!");
-        }
+        getClientSocketChannel().read(buffer);
+        deserializedServerMessage = (ServerCustomMessage) GlobalProperties.deserializeMessage(buffer.array());
 
-        final ServerCustomMessage deserializedServerMessage = (ServerCustomMessage) GlobalProperties.deserializeMessage(buffer.array());
 
         if (deserializedServerMessage.getServerMessageKey() == ServerMessageKey.SUBACK) {
             System.out.println("Subscribe acknowledgement received.");
@@ -41,15 +39,23 @@ public class ClientSubscriber extends Client {
 
     private void prepareAckForWrite(final ClientMessageKey clientMessageKey, final ServerCustomMessage dataReceived) throws IOException {
         if (this.isConnected()) {
-            getMessageGeneratorThreading().getMessageGenerator().getMessagesToWrite().add(new ClientCustomMessage(clientMessageKey, "Ack for " + dataReceived.getServerMessageKey().toString()));
+            synchronized (getMessageGeneratorThreading().getMessageGenerator().getMessagesToWrite()) {
+                getMessageGeneratorThreading().getMessageGenerator().getMessagesToWrite().add(new ClientCustomMessage(clientMessageKey, "Ack for " + dataReceived.getServerMessageKey().toString()));
+            }
             getSelectionKey().interestOps(SelectionKey.OP_WRITE);
         } else {
             System.out.println("Client is not connected yet and thus it can't write.");
         }
     }
-    public static void main(String[] args) throws IOException, ClassNotFoundException {
+
+    public static void main(String[] args) {
         final ClientSubscriber clientSubscriber = new ClientSubscriber(new SubscriberMessageGenerator());
 
-        clientSubscriber.connectionManager();
+        try {
+            clientSubscriber.connectionManager();
+        } catch (IOException e) {
+            e.printStackTrace();
+            clientSubscriber.getMessageGeneratorThreading().shutdown();
+        }
     }
 }

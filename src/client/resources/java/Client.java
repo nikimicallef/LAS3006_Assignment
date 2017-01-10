@@ -71,7 +71,7 @@ public abstract class Client {
     }
 
 
-    void connectionManager() throws IOException, ClassNotFoundException {
+    void connectionManager() throws IOException {
         if(selectionKey != null){
             System.out.println("1= read. 4 = write. 5 = read|write. InterestOps: " + selectionKey.interestOps());
         }
@@ -100,7 +100,11 @@ public abstract class Client {
                         connect();
                         prepareConnectMessage();
                     } else if (selectionKey.isValid() &&selectionKey.isReadable()) {
-                        read();
+                        try {
+                            read();
+                        } catch (ClassNotFoundException | IOException e) {
+                           disconnectClient();
+                        }
                     } else if (selectionKey.isValid() &&selectionKey.isWritable()) {
                         write();
                     }
@@ -113,7 +117,9 @@ public abstract class Client {
         if(!isConnected()) {
             final ClientCustomMessage clientCustomMessage = new ClientCustomMessage(ClientMessageKey.CONNECT, clientSubscriberId);
 
-            messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().add(clientCustomMessage);
+            synchronized (messageGeneratorThreading.getMessageGenerator().getMessagesToWrite()) {
+                messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().add(clientCustomMessage);
+            }
 
             selectionKey.interestOps(SelectionKey.OP_WRITE);
         } else {
@@ -134,21 +140,23 @@ public abstract class Client {
 
     private void write() throws IOException {
         boolean disconnect = false;
-        if (messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().size() > 0) {
-            do {
-                if(messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().get(0).getClientMessageKey() == ClientMessageKey.DISCONNECT){
-                    disconnect = true;
-                }
+        synchronized (messageGeneratorThreading.getMessageGenerator().getMessagesToWrite()) {
+            if (messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().size() > 0) {
+                do {
+                    if (messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().get(0).getClientMessageKey() == ClientMessageKey.DISCONNECT) {
+                        disconnect = true;
+                    }
 
-                if(!isConnected() && messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().get(0).getClientMessageKey() != ClientMessageKey.CONNECT){
-                    messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().remove(0);
-                } else {
-                    System.out.println("Writing msg of type " + messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().get(0).getClientMessageKey());
-                    final byte[] serializedMessage = GlobalProperties.serializeMessage(messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().get(0));
-                    messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().remove(0);
-                    clientSocketChannel.write(ByteBuffer.wrap(serializedMessage));
-                }
-            }while (messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().size() > 0);
+                    if (!isConnected() && messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().get(0).getClientMessageKey() != ClientMessageKey.CONNECT) {
+                        messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().remove(0);
+                    } else {
+                        System.out.println("Writing msg of type " + messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().get(0).getClientMessageKey());
+                        final byte[] serializedMessage = GlobalProperties.serializeMessage(messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().get(0));
+                        messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().remove(0);
+                        clientSocketChannel.write(ByteBuffer.wrap(serializedMessage));
+                    }
+                } while (messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().size() > 0);
+            }
         }
 
         if(disconnect){

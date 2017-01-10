@@ -1,23 +1,22 @@
 import java.security.SecureRandom;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Created by niki on 09/01/17.
  */
 public abstract class MessageGenerator implements Runnable {
-    final int waitTimeSeconds = 5;
+    final int pollingRateSeconds = 1;
     final List<String> topLevelPath = Arrays.asList("bedroom", "bathroom", "kitchen", "#", "+");
     final List<String> midLevelPath = Arrays.asList("aircondition", "boiler", "heater", "#", "+");
     final List<String> bottomLevelPath = Arrays.asList("temperature", "status", "#", "+");
     final SecureRandom secureRandom = new SecureRandom();
     final List<ClientCustomMessage> messagesToWrite = Collections.synchronizedList(new ArrayList<>());
 
-    public int getWaitTimeSeconds() {
-        return waitTimeSeconds;
+    public int getPollingRateSeconds() {
+        return pollingRateSeconds;
     }
 
-    public List<ClientCustomMessage> getMessagesToWrite() {
+    public synchronized List<ClientCustomMessage> getMessagesToWrite() {
         return messagesToWrite;
     }
 
@@ -95,6 +94,8 @@ public abstract class MessageGenerator implements Runnable {
 
     @Override
     public void run() {
-        messagesToWrite.add(generate());
+        synchronized (messagesToWrite) {
+            messagesToWrite.add(generate());
+        }
     }
 }

@@ -29,9 +29,14 @@ public class ClientPublisher extends Client{
         }
     }
 
-    public static void main(String[] args) throws IOException, ClassNotFoundException {
+    public static void main(String[] args) {
         final ClientPublisher clientPublisher = new ClientPublisher();
 
-        clientPublisher.connectionManager();
+        try {
+            clientPublisher.connectionManager();
+        } catch (IOException e) {
+            e.printStackTrace();
+            clientPublisher.getMessageGeneratorThreading().shutdown();
+        }
     }
 }

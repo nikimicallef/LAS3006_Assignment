@@ -21,6 +21,10 @@ public class PublisherMessageGenerator extends MessageGenerator {
         } else if (clientMessageKey == ClientMessageKey.PINGREQ) {
             return new ClientCustomMessage(ClientMessageKey.PINGREQ, secureRandom.nextInt(9999));
         }
-        return new ClientCustomMessage(ClientMessageKey.DISCONNECT);
+        if(secureRandom.nextInt(10) == 0) {
+            return new ClientCustomMessage(ClientMessageKey.DISCONNECT);
+        } else {
+            return generate();
+        }
     }
 }

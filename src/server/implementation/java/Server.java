@@ -17,10 +17,14 @@ public class Server {
     private Map<Path, List<SelectionKey>> listOfSubscribers = new HashMap<>();
     private final List<Pair<SelectionKey, ServerCustomMessage>> messagesToSend = new ArrayList<>();
 
+    private final InactivityChannelMonitorThreading inactivityChannelMonitorThreading;
+
     Server(final boolean initialiseServer) {
         if (initialiseServer) {
             init();
         }
+
+        inactivityChannelMonitorThreading = new InactivityChannelMonitorThreading(new InactivityChannelMonitor());
     }
 
     private void init() {
@@ -44,13 +48,13 @@ public class Server {
 
     private void connectionManager() throws IOException, ClassNotFoundException {
         while (true) {
+            disconnectInactiveChannels();
             if (serverSelector.select() > 0) {
                 final Iterator<SelectionKey> keyIterator = serverSelector.selectedKeys().iterator();
 
                 while (keyIterator.hasNext()) {
                     final SelectionKey selectionKey = keyIterator.next();
                     keyIterator.remove();
-
                     if (!selectionKey.isValid()) {
                         System.out.println("Selection key is not valid. " + selectionKey.toString());
                     } else if (selectionKey.isAcceptable()) {
@@ -65,11 +69,37 @@ public class Server {
         }
     }
 
+    private void disconnectInactiveChannels() {
+        final List<SelectionKey> keysNotInvalidated = new ArrayList<>();
+        synchronized (inactivityChannelMonitorThreading.getInactivityChannelMonitor().getKeysToInvalidate()) {
+            inactivityChannelMonitorThreading.getInactivityChannelMonitor().getKeysToInvalidate().forEach(selectionKey -> {
+                try {
+                    System.out.println("Closing inactive channel " + selectionKey.channel());
+                    closeChannel(selectionKey, false);
+                    synchronized (inactivityChannelMonitorThreading.getInactivityChannelMonitor().getLastSelectionKeyActivityTime()) {
+                        inactivityChannelMonitorThreading.getInactivityChannelMonitor().getLastSelectionKeyActivityTime().remove(selectionKey);
+                    }
+                } catch (IOException e) {
+                    System.out.println("Could not close " + selectionKey.channel());
+                    keysNotInvalidated.add(selectionKey);
+                }
+            });
+        }
+
+        synchronized (inactivityChannelMonitorThreading.getInactivityChannelMonitor().getKeysToInvalidate()) {
+            inactivityChannelMonitorThreading.getInactivityChannelMonitor().setKeysToInvalidate(new ArrayList<>(keysNotInvalidated));
+        }
+    }
+
     private void acceptConnection(final SelectionKey selectionKey) throws IOException {
         final ServerSocketChannel serverSocketChannel = (ServerSocketChannel) selectionKey.channel();
         final SocketChannel clientSocketChannel = serverSocketChannel.accept();
         clientSocketChannel.configureBlocking(false);
-        clientSocketChannel.register(selectionKey.selector(), SelectionKey.OP_READ);
+        final SelectionKey newSelectionKey = clientSocketChannel.register(selectionKey.selector(), SelectionKey.OP_READ);
+
+        synchronized (inactivityChannelMonitorThreading.getInactivityChannelMonitor().getLastSelectionKeyActivityTime()) {
+            inactivityChannelMonitorThreading.getInactivityChannelMonitor().getLastSelectionKeyActivityTime().putIfAbsent(newSelectionKey, System.currentTimeMillis());
+        }
     }
 
     private void write(final SelectionKey selectionKey) throws IOException {
@@ -101,72 +131,86 @@ public class Server {
 
         try {
             socketChannel.read(buffer);
+            ClientCustomMessage deserializedClientMessage = (ClientCustomMessage) GlobalProperties.deserializeMessage(buffer.array());
+
+            if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PUBLISH) {
+                System.out.println("Data read: " + deserializedClientMessage.getMessage());
+
+                prepareAckMessage(ServerMessageKey.PUBACK, selectionKey);
+
+                final List<Path> validPaths = listOfSubscribers.keySet().stream().filter(path -> pathsMatch(deserializedClientMessage.getPath(), path)).collect(Collectors.toList());
+
+                validPaths.forEach(path -> {
+                    final List<SelectionKey> selectionKeys = listOfSubscribers.get(path);
+                    selectionKeys.forEach(selectionKey1 -> preparePublishMessage(selectionKey1, deserializedClientMessage.getMessage()));
+                });
+            } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PUBREC) {
+                System.out.println("Pubrec received for " + deserializedClientMessage.getClientMessageKey().toString());
+            } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.SUBSCRIBE) {
+                System.out.println("Subscribe to Path: " + deserializedClientMessage.getPath());
+
+                final boolean pathValid = pathChecker(deserializedClientMessage.getPath());
+
+                if (pathValid) {
+                    listOfSubscribers.putIfAbsent(Paths.get(deserializedClientMessage.getPath()), new ArrayList<>());
+                    if (!listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).contains(selectionKey)) {
+                        listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).add(selectionKey);
+                    }
+                } else {
+                    System.out.println("Path " + deserializedClientMessage.getPath() + " is not valid.");
+                }
+
+                prepareAckMessage(ServerMessageKey.SUBACK, selectionKey);
+            } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.CONNECT) {
+                System.out.println("Connect message received from client with id " + deserializedClientMessage.getClientId());
+
+                prepareAckMessage(ServerMessageKey.CONNACK, selectionKey);
+            } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.UNSUBSCRIBE) {
+                if (listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())) != null) {
+                    if (listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).remove(selectionKey)) {
+                        System.out.println("SelectionKey " + selectionKey.channel() + " is not subscribed to " + deserializedClientMessage.getPath());
+                    }
+                } else {
+                    System.out.println("No subscribers on path " + deserializedClientMessage.getPath());
+                }
+
+                prepareAckMessage(ServerMessageKey.UNSUBACK, selectionKey);
+            } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PINGREQ) {
+                System.out.println("Pingreq received from " + selectionKey.channel());
+
+                synchronized (inactivityChannelMonitorThreading.getInactivityChannelMonitor().getLastSelectionKeyActivityTime()) {
+                    inactivityChannelMonitorThreading.getInactivityChannelMonitor().getLastSelectionKeyActivityTime().put(selectionKey, System.currentTimeMillis());
+                }
+
+                prepareAckMessage(ServerMessageKey.PINGRESP, selectionKey);
+            } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.DISCONNECT) {
+                System.out.println("Disconnect received.");
+
+                listOfSubscribers.keySet().forEach(path -> listOfSubscribers.get(path).remove(selectionKey));
+
+                closeChannel(selectionKey, true);
+            }
         } catch (final IOException e) {
-            throw new IllegalStateException("Failed to read!");
+            System.out.println("Failed to read from " + socketChannel);
         }
+    }
 
-        final ClientCustomMessage deserializedClientMessage = (ClientCustomMessage) GlobalProperties.deserializeMessage(buffer.array());
+    private void closeChannel(final SelectionKey selectionKey, final boolean automated) throws IOException {
+        listOfSubscribers.keySet().forEach(path -> listOfSubscribers.get(path).remove(selectionKey));
 
-        if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PUBLISH) {
-            System.out.println("Data read: " + deserializedClientMessage.getMessage());
-
-            prepareAckMessage(ServerMessageKey.PUBACK, selectionKey);
-
-            final List<Path> validPaths = listOfSubscribers.keySet().stream().filter(path -> pathsMatch(deserializedClientMessage.getPath(), path)).collect(Collectors.toList());
-
-            validPaths.forEach(path -> {
-                final List<SelectionKey> selectionKeys = listOfSubscribers.get(path);
-                selectionKeys.forEach(selectionKey1 -> preparePublishMessage(selectionKey1, deserializedClientMessage.getMessage()));
-            });
-        } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PUBREC) {
-            System.out.println("Pubrec received for " + deserializedClientMessage.getClientMessageKey().toString());
-        } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.SUBSCRIBE) {
-            System.out.println("Subscribe to Path: " + deserializedClientMessage.getPath());
-
-            final boolean pathValid = pathChecker(deserializedClientMessage.getPath());
-
-            if (pathValid) {
-                listOfSubscribers.putIfAbsent(Paths.get(deserializedClientMessage.getPath()), new ArrayList<>());
-                if(!listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).contains(selectionKey)){
-                    listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).add(selectionKey);
-                }
-            } else {
-                System.out.println("Path " + deserializedClientMessage.getPath() + " is not valid.");
+        if(automated) {
+            synchronized (inactivityChannelMonitorThreading.getInactivityChannelMonitor().getKeysToInvalidate()) {
+                inactivityChannelMonitorThreading.getInactivityChannelMonitor().getKeysToInvalidate().remove(selectionKey);
             }
 
-            prepareAckMessage(ServerMessageKey.SUBACK, selectionKey);
-        } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.CONNECT) {
-            System.out.println("Connect message received from client with id " + deserializedClientMessage.getClientId());
-
-            //TODO: Keep the client id?
-
-            prepareAckMessage(ServerMessageKey.CONNACK, selectionKey);
-        } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.UNSUBSCRIBE) {
-            if (listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())) != null) {
-                if (listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).remove(selectionKey)) {
-                    System.out.println("SelectionKey " + selectionKey.channel() + " is not subscribed to " + deserializedClientMessage.getPath());
-                }
-            } else {
-                System.out.println("No subscribers on path " + deserializedClientMessage.getPath());
+            synchronized (inactivityChannelMonitorThreading.getInactivityChannelMonitor().getLastSelectionKeyActivityTime()) {
+                inactivityChannelMonitorThreading.getInactivityChannelMonitor().getLastSelectionKeyActivityTime().remove(selectionKey);
             }
-
-            prepareAckMessage(ServerMessageKey.UNSUBACK, selectionKey);
-        } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PINGREQ) {
-            System.out.println("Pingreq received from " + deserializedClientMessage.getMessageId());
-
-            prepareAckMessage(ServerMessageKey.PINGRESP, selectionKey);
-        } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.DISCONNECT) {
-            System.out.println("Disconnect received.");
-
-            listOfSubscribers.keySet().forEach(path -> {
-                final List<SelectionKey> selectionKeyList = listOfSubscribers.get(path);
-                selectionKeyList.remove(selectionKey);
-            });
-
-            selectionKey.channel().close();
-            ((SocketChannel) selectionKey.channel()).socket().close();
-            selectionKey.cancel();
         }
+
+        selectionKey.channel().close();
+        ((SocketChannel) selectionKey.channel()).socket().close();
+        selectionKey.cancel();
     }
 
     boolean pathsMatch(final String inputtedPath, final Path pathInHashMap) {
