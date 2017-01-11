@@ -4,12 +4,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 
 public class ClientSubscriber extends Client {
-    ClientSubscriber(final MessageGenerator messageGenerator) {
-        super(messageGenerator);
+    ClientSubscriber() {
+        super();
     }
 
     void read() throws IOException, ClassNotFoundException {
-        final ByteBuffer buffer = ByteBuffer.allocate(1024);
+        final ByteBuffer buffer = ByteBuffer.allocate(4096);
         final ServerCustomMessage deserializedServerMessage;
 
         getClientSocketChannel().read(buffer);
@@ -40,7 +40,7 @@ public class ClientSubscriber extends Client {
     private void prepareAckForWrite(final ClientMessageKey clientMessageKey, final ServerCustomMessage dataReceived) throws IOException {
         if (this.isConnected()) {
             synchronized (getMessageGeneratorThreading().getMessageGenerator().getMessagesToWrite()) {
-                getMessageGeneratorThreading().getMessageGenerator().getMessagesToWrite().add(new ClientCustomMessage(clientMessageKey, "Ack for " + dataReceived.getServerMessageKey().toString()));
+                getMessageGeneratorThreading().getMessageGenerator().getMessagesToWrite().add(new ClientCustomMessage(clientMessageKey, this.getClientId(), "Ack for " + dataReceived.getServerMessageKey().toString()));
             }
             getSelectionKey().interestOps(SelectionKey.OP_WRITE);
         } else {
@@ -49,7 +49,8 @@ public class ClientSubscriber extends Client {
     }
 
     public static void main(String[] args) {
-        final ClientSubscriber clientSubscriber = new ClientSubscriber(new SubscriberMessageGenerator());
+        final ClientSubscriber clientSubscriber = new ClientSubscriber();
+        clientSubscriber.setMessageGenerator(new SubscriberMessageGenerator(clientSubscriber.getClientId()));
 
         try {
             clientSubscriber.connectionManager();

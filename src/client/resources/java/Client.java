@@ -13,7 +13,7 @@ import java.util.UUID;
 public abstract class Client {
     private Selector clientSelector = null;
     private SocketChannel clientSocketChannel = null;
-    private String clientSubscriberId;
+    private String clientId;
     private boolean connected = false;
     private SelectionKey selectionKey = null;
     private MessageGeneratorThreading messageGeneratorThreading;
@@ -23,17 +23,9 @@ public abstract class Client {
         return messageGeneratorThreading;
     }
 
-    public Selector getClientSelector() {
-        return clientSelector;
-    }
-
     public SocketChannel getClientSocketChannel() {
         return clientSocketChannel;
     }
-
-    /*public long getClientSubscriberId() {
-        return clientSubscriberId;
-    }*/
 
     public boolean isConnected() {
         return connected;
@@ -47,8 +39,12 @@ public abstract class Client {
         return selectionKey;
     }
 
-    public Client(final MessageGenerator messageGenerator) {
-        clientSubscriberId = UUID.randomUUID().toString();
+    public String getClientId() {
+        return clientId;
+    }
+
+    public Client() {
+        clientId = UUID.randomUUID().toString();
 
         if (clientSelector != null) {
             return;
@@ -66,16 +62,14 @@ public abstract class Client {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
 
+    public void setMessageGenerator(final MessageGenerator messageGenerator) {
         messageGeneratorThreading = new MessageGeneratorThreading(messageGenerator);
     }
 
 
     void connectionManager() throws IOException {
-        if(selectionKey != null){
-            System.out.println("1= read. 4 = write. 5 = read|write. InterestOps: " + selectionKey.interestOps());
-        }
-
         while(monitorSelectionKeys) {
             if (clientSelector.select() > 0) {
                 if (clientSelector.selectedKeys().size() > 1) {
@@ -115,7 +109,7 @@ public abstract class Client {
 
     private void prepareConnectMessage() throws IOException {
         if(!isConnected()) {
-            final ClientCustomMessage clientCustomMessage = new ClientCustomMessage(ClientMessageKey.CONNECT, clientSubscriberId);
+            final ClientCustomMessage clientCustomMessage = new ClientCustomMessage(ClientMessageKey.CONNECT, clientId);
 
             synchronized (messageGeneratorThreading.getMessageGenerator().getMessagesToWrite()) {
                 messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().add(clientCustomMessage);
@@ -133,7 +127,7 @@ public abstract class Client {
         }
         clientSocketChannel.configureBlocking(false);
         selectionKey.interestOps(SelectionKey.OP_READ);
-        System.out.println("channel is " + selectionKey.channel().toString());
+        System.out.println("This client has id " + clientId + ". Channel is " + selectionKey.channel().toString());
     }
 
     abstract void read() throws IOException, ClassNotFoundException;

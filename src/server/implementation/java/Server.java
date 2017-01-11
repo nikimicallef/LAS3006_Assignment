@@ -1,23 +1,60 @@
+import javax.management.*;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class Server {
+public class Server implements ServerMbean {
     private Selector serverSelector = null;
     private ServerSocketChannel serverSocketChannel = null;
 
-    private Map<Path, List<SelectionKey>> listOfSubscribers = new HashMap<>();
+    private Map<String, List<SelectionKey>> listOfSubscribers = new HashMap<>();
     private final List<Pair<SelectionKey, ServerCustomMessage>> messagesToSend = new ArrayList<>();
 
     private final InactivityChannelMonitorThreading inactivityChannelMonitorThreading;
+
+    private int clientsConnected = 0;
+    private int totalMessagesDelivered = 0;
+    private Map<String, Integer> noOfMessagesDeliveredPerTopic = new HashMap<>();
+    private Map<String, Integer> noOfMessagesDeliveredToEachClient = new HashMap<>();
+    private Map<String, Integer> noOfMessagesPublishedByEachClient = new HashMap<>();
+    private Map<SelectionKey, String> mapSelectionKeyWithClientId = new HashMap<>();
+
+    @Override
+    public int getClientsConnected() {
+        return clientsConnected;
+    }
+
+    @Override
+    public Set<String> getActivePath() {
+        return listOfSubscribers.keySet();
+    }
+
+    @Override
+    public int getTotalMessagesDelivered() {
+        return totalMessagesDelivered;
+    }
+
+    @Override
+    public Map<String, Integer> getNoOfMessagesDeliveredPerTopic() {
+        return noOfMessagesDeliveredPerTopic;
+    }
+
+    @Override
+    public Map<String, Integer> getNoOfMessagesDeliveredToEachClient() {
+        return noOfMessagesDeliveredToEachClient;
+    }
+
+    @Override
+    public Map<String, Integer> noOfMessagesPublishedByEachClient() {
+        return noOfMessagesPublishedByEachClient;
+    }
 
     Server(final boolean initialiseServer) {
         if (initialiseServer) {
@@ -114,6 +151,8 @@ public class Server {
                 serializedMessage = GlobalProperties.serializeMessage(messageToSend.getSecond());
                 messagesToRemove.add(messageToSend);
                 socketChannel.write(ByteBuffer.wrap(serializedMessage));
+                totalMessagesDelivered++;
+                noOfMessagesDeliveredToEachClient.put(mapSelectionKeyWithClientId.get(selectionKey), noOfMessagesDeliveredToEachClient.get(mapSelectionKeyWithClientId.get(selectionKey))+1);
             } catch (IOException e) {
                 System.out.println("Failed to write.");
                 e.printStackTrace();
@@ -133,16 +172,22 @@ public class Server {
             socketChannel.read(buffer);
             ClientCustomMessage deserializedClientMessage = (ClientCustomMessage) GlobalProperties.deserializeMessage(buffer.array());
 
+            noOfMessagesDeliveredToEachClient.putIfAbsent(deserializedClientMessage.getClientId(), 0);
+            noOfMessagesPublishedByEachClient().put(deserializedClientMessage.getClientId(), noOfMessagesDeliveredToEachClient.get(deserializedClientMessage.getClientId()+1));
+
             if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PUBLISH) {
                 System.out.println("Data read: " + deserializedClientMessage.getMessage());
 
                 prepareAckMessage(ServerMessageKey.PUBACK, selectionKey);
 
-                final List<Path> validPaths = listOfSubscribers.keySet().stream().filter(path -> pathsMatch(deserializedClientMessage.getPath(), path)).collect(Collectors.toList());
+                final List<String> validPaths = listOfSubscribers.keySet().stream().filter(path -> pathsMatch(deserializedClientMessage.getPath(), path)).collect(Collectors.toList());
 
                 validPaths.forEach(path -> {
                     final List<SelectionKey> selectionKeys = listOfSubscribers.get(path);
-                    selectionKeys.forEach(selectionKey1 -> preparePublishMessage(selectionKey1, deserializedClientMessage.getMessage()));
+                    selectionKeys.forEach(selectionKey1 -> {
+                        preparePublishMessage(selectionKey1, deserializedClientMessage.getMessage());
+                        noOfMessagesDeliveredPerTopic.put(path, noOfMessagesDeliveredPerTopic.get(path)+1);
+                    });
                 });
             } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PUBREC) {
                 System.out.println("Pubrec received for " + deserializedClientMessage.getClientMessageKey().toString());
@@ -152,10 +197,12 @@ public class Server {
                 final boolean pathValid = pathChecker(deserializedClientMessage.getPath());
 
                 if (pathValid) {
-                    listOfSubscribers.putIfAbsent(Paths.get(deserializedClientMessage.getPath()), new ArrayList<>());
-                    if (!listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).contains(selectionKey)) {
-                        listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).add(selectionKey);
+                    listOfSubscribers.putIfAbsent(deserializedClientMessage.getPath(), new ArrayList<>());
+                    if (!listOfSubscribers.get(deserializedClientMessage.getPath()).contains(selectionKey)) {
+                        listOfSubscribers.get(deserializedClientMessage.getPath()).add(selectionKey);
                     }
+
+                    noOfMessagesDeliveredPerTopic.putIfAbsent(deserializedClientMessage.getPath(), 0);
                 } else {
                     System.out.println("Path " + deserializedClientMessage.getPath() + " is not valid.");
                 }
@@ -164,10 +211,14 @@ public class Server {
             } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.CONNECT) {
                 System.out.println("Connect message received from client with id " + deserializedClientMessage.getClientId());
 
+                clientsConnected++;
+                noOfMessagesDeliveredToEachClient.put(deserializedClientMessage.getClientId(), 0);
+                mapSelectionKeyWithClientId.put(selectionKey, deserializedClientMessage.getClientId());
+
                 prepareAckMessage(ServerMessageKey.CONNACK, selectionKey);
             } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.UNSUBSCRIBE) {
-                if (listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())) != null) {
-                    if (listOfSubscribers.get(Paths.get(deserializedClientMessage.getPath())).remove(selectionKey)) {
+                if (listOfSubscribers.get(deserializedClientMessage.getPath()) != null) {
+                    if (listOfSubscribers.get(deserializedClientMessage.getPath()).remove(selectionKey)) {
                         System.out.println("SelectionKey " + selectionKey.channel() + " is not subscribed to " + deserializedClientMessage.getPath());
                     }
                 } else {
@@ -198,7 +249,7 @@ public class Server {
     private void closeChannel(final SelectionKey selectionKey, final boolean automated) throws IOException {
         listOfSubscribers.keySet().forEach(path -> listOfSubscribers.get(path).remove(selectionKey));
 
-        if(automated) {
+        if (automated) {
             synchronized (inactivityChannelMonitorThreading.getInactivityChannelMonitor().getKeysToInvalidate()) {
                 inactivityChannelMonitorThreading.getInactivityChannelMonitor().getKeysToInvalidate().remove(selectionKey);
             }
@@ -208,16 +259,16 @@ public class Server {
             }
         }
 
+        clientsConnected--;
+
         selectionKey.channel().close();
         ((SocketChannel) selectionKey.channel()).socket().close();
         selectionKey.cancel();
     }
 
-    boolean pathsMatch(final String inputtedPath, final Path pathInHashMap) {
-        final String pathInHashMapAsString = pathInHashMap.toString();
-
+    boolean pathsMatch(final String inputtedPath, final String pathInHashMap) {
         final String[] inputtedPathSplit = inputtedPath.split("/");
-        final String[] pathInHashMapSplit = pathInHashMapAsString.split("/");
+        final String[] pathInHashMapSplit = pathInHashMap.split("/");
 
         for (int counter = 0; counter < pathInHashMapSplit.length; counter++) {
             if (pathInHashMapSplit[counter].equals("#") || (inputtedPathSplit.length > counter && inputtedPathSplit[counter].equals("#"))) {
@@ -269,8 +320,17 @@ public class Server {
         selectionKey.interestOps(SelectionKey.OP_WRITE);
     }
 
-    public static void main(String[] args) throws IOException, ClassNotFoundException {
+    public ObjectName getObjectName() throws MalformedObjectNameException {
+        return new ObjectName("AssignmentMonitoring:type=ServerMonitoring");
+    }
+
+    public static void main(String[] args) throws IOException, ClassNotFoundException, MalformedObjectNameException, NotCompliantMBeanException, InstanceAlreadyExistsException, MBeanRegistrationException {
         final Server server = new Server(true);
+
+        final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+        mbs.registerMBean(server.inactivityChannelMonitorThreading.getInactivityChannelMonitor(), server.inactivityChannelMonitorThreading.getInactivityChannelMonitor().getObjectName());
+        mbs.registerMBean(server, server.getObjectName());
+
         server.connectionManager();
     }
 }

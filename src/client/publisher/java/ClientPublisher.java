@@ -3,12 +3,12 @@ import java.nio.ByteBuffer;
 
 public class ClientPublisher extends Client{
     ClientPublisher() {
-        super(new PublisherMessageGenerator());
+        super();
     }
 
 
     void read() throws IOException, ClassNotFoundException {
-        final ByteBuffer buffer = ByteBuffer.allocate(1024);
+        final ByteBuffer buffer = ByteBuffer.allocate(4096);
 
         try {
             getClientSocketChannel().read(buffer);
@@ -31,6 +31,7 @@ public class ClientPublisher extends Client{
 
     public static void main(String[] args) {
         final ClientPublisher clientPublisher = new ClientPublisher();
+        clientPublisher.setMessageGenerator(new PublisherMessageGenerator(clientPublisher.getClientId()));
 
         try {
             clientPublisher.connectionManager();

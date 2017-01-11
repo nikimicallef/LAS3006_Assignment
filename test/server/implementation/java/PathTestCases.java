@@ -5,9 +5,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class PathTestCases {
-    private static final Path singleLevelWildcard = Paths.get("home/+/temperature");
-    private static final Path multiLevelWildcard = Paths.get("home/kitchen/#");
-    private static final Path noWildcard = Paths.get("home/kitchen/temperature");
+    private static final String singleLevelWildcard = "home/+/temperature";
+    private static final String multiLevelWildcard = "home/kitchen/#";
+    private static final String noWildcard = "home/kitchen/temperature";
 
     @Test
     public void noWildcard_matches1(){
@@ -20,14 +20,14 @@ public class PathTestCases {
     public void noWildcard_matches2(){
         final Server server = new Server(false);
 
-        Assert.assertEquals(true, server.pathsMatch("home",Paths.get("#")));
+        Assert.assertEquals(true, server.pathsMatch("home","#"));
     }
 
     @Test
     public void noWildcard_matches3(){
         final Server server = new Server(false);
 
-        Assert.assertEquals(true, server.pathsMatch("home",Paths.get("+")));
+        Assert.assertEquals(true, server.pathsMatch("home","+"));
     }
 
     @Test
@@ -132,63 +132,63 @@ public class PathTestCases {
     public void multipleWildcards__matches1(){
         final Server server = new Server(false);
 
-        Assert.assertEquals(true, server.pathsMatch("a/+/c",Paths.get("a/b/+")));
+        Assert.assertEquals(true, server.pathsMatch("a/+/c","a/b/+"));
     }
 
     @Test
     public void multipleWildcards_matches2(){
         final Server server = new Server(false);
 
-        Assert.assertEquals(true, server.pathsMatch("a/+/c",Paths.get("a/b/#")));
+        Assert.assertEquals(true, server.pathsMatch("a/+/c","a/b/#"));
     }
 
     @Test
     public void multipleWildcards_matches3(){
         final Server server = new Server(false);
 
-        Assert.assertEquals(true, server.pathsMatch("a/+/#",Paths.get("a/b/#")));
+        Assert.assertEquals(true, server.pathsMatch("a/+/#","a/b/#"));
     }
 
     @Test
     public void multipleWildcards_matches4(){
         final Server server = new Server(false);
 
-        Assert.assertEquals(true, server.pathsMatch("a/+/a",Paths.get("a/#")));
+        Assert.assertEquals(true, server.pathsMatch("a/+/a","a/#"));
     }
 
     @Test
     public void multipleWildcards_matches5(){
         final Server server = new Server(false);
 
-        Assert.assertEquals(true, server.pathsMatch("a/#",Paths.get("a/+/a")));
+        Assert.assertEquals(true, server.pathsMatch("a/#","a/+/a"));
     }
 
     @Test
     public void multipleWildcards_matches6(){
         final Server server = new Server(false);
 
-        Assert.assertEquals(true, server.pathsMatch("a/+/#",Paths.get("a/#")));
+        Assert.assertEquals(true, server.pathsMatch("a/+/#","a/#"));
     }
 
     @Test
     public void multipleWildcards_matches7(){
         final Server server = new Server(false);
 
-        Assert.assertEquals(true, server.pathsMatch("a/+/+",Paths.get("a/#")));
+        Assert.assertEquals(true, server.pathsMatch("a/+/+","a/#"));
     }
 
     @Test
     public void multipleWildcards_doesntMatch1(){
         final Server server = new Server(false);
 
-        Assert.assertEquals(false, server.pathsMatch("a/+/#",Paths.get("a/+")));
+        Assert.assertEquals(false, server.pathsMatch("a/+/#","a/+"));
     }
 
     @Test
     public void multipleWildcards_doesntMatch3(){
         final Server server = new Server(false);
 
-        Assert.assertEquals(true, server.pathsMatch("a/#",Paths.get("a/+/+")));
+        Assert.assertEquals(true, server.pathsMatch("a/#","a/+/+"));
     }
     
     @Test
