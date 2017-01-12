@@ -217,15 +217,17 @@ public class Server implements ServerMbean {
 
                 prepareAckMessage(ServerMessageKey.CONNACK, selectionKey);
             } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.UNSUBSCRIBE) {
+                boolean unsubscribeSuccessful = false;
                 if (listOfSubscribers.get(deserializedClientMessage.getPath()) != null) {
                     if (listOfSubscribers.get(deserializedClientMessage.getPath()).remove(selectionKey)) {
-                        System.out.println("SelectionKey " + selectionKey.channel() + " is not subscribed to " + deserializedClientMessage.getPath());
+                        unsubscribeSuccessful = true;
+                        System.out.println(selectionKey.channel() + " has unsubscribed from " + deserializedClientMessage.getPath());
                     }
                 } else {
                     System.out.println("No subscribers on path " + deserializedClientMessage.getPath());
                 }
 
-                prepareAckMessage(ServerMessageKey.UNSUBACK, selectionKey);
+                prepareAckMessage(ServerMessageKey.UNSUBACK, selectionKey, unsubscribeSuccessful);
             } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PINGREQ) {
                 System.out.println("Pingreq received from " + selectionKey.channel());
 
@@ -308,8 +310,12 @@ public class Server implements ServerMbean {
         return true;
     }
 
-    private void prepareAckMessage(final ServerMessageKey serverMessageKey, final SelectionKey selectionKey) {
-        messagesToSend.add(new Pair<>(selectionKey, new ServerCustomMessage(serverMessageKey, "Ack of type " + serverMessageKey)));
+    private void prepareAckMessage(final ServerMessageKey serverMessageKey, final SelectionKey selectionKey, final boolean...status) {
+        if(serverMessageKey == ServerMessageKey.UNSUBACK){
+            messagesToSend.add(new Pair<>(selectionKey, new ServerCustomMessage(serverMessageKey, "Ack of type " + serverMessageKey, status[0])));
+        } else {
+            messagesToSend.add(new Pair<>(selectionKey, new ServerCustomMessage(serverMessageKey, "Ack of type " + serverMessageKey)));
+        }
 
         selectionKey.interestOps(SelectionKey.OP_WRITE);
     }

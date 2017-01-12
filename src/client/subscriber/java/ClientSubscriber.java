@@ -26,7 +26,7 @@ public class ClientSubscriber extends Client {
             System.out.println("CONNACK received");
             this.setConnected(true);
         } else if (deserializedServerMessage.getServerMessageKey() == ServerMessageKey.UNSUBACK) {
-            System.out.println("Unsubscribe acknowledgement received.");
+            System.out.println(deserializedServerMessage.getServerMessageKey() + " received. Unsubscribe status: " + deserializedServerMessage.getUnsubSuccessful());
             getSelectionKey().interestOps(SelectionKey.OP_WRITE);
         } else if (deserializedServerMessage.getServerMessageKey() == ServerMessageKey.PINGRESP) {
             System.out.println("PINGRESP Received: " + deserializedServerMessage.getMessage());

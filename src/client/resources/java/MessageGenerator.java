@@ -1,14 +1,11 @@
 import java.security.SecureRandom;
 import java.util.*;
 
-/**
- * Created by niki on 09/01/17.
- */
 public abstract class MessageGenerator implements Runnable {
     final int pollingRateSeconds = 1;
-    final List<String> topLevelPath = Arrays.asList("bedroom", "bathroom", "kitchen", "#", "+");
-    final List<String> midLevelPath = Arrays.asList("aircondition", "boiler", "heater", "#", "+");
-    final List<String> bottomLevelPath = Arrays.asList("temperature", "status", "#", "+");
+    final List<String> topLevelPath = Arrays.asList("bedroom"/*, "bathroom", "kitchen", "#", "+"*/);
+    final List<String> midLevelPath = Arrays.asList("aircondition"/*, "boiler", "heater", "#", "+"*/);
+    final List<String> bottomLevelPath = Arrays.asList("temperature"/*, "status", "#", "+"*/);
     final SecureRandom secureRandom = new SecureRandom();
     final List<ClientCustomMessage> messagesToWrite = Collections.synchronizedList(new ArrayList<>());
 
@@ -16,7 +13,7 @@ public abstract class MessageGenerator implements Runnable {
         return pollingRateSeconds;
     }
 
-    public synchronized List<ClientCustomMessage> getMessagesToWrite() {
+    public List<ClientCustomMessage> getMessagesToWrite() {
         return messagesToWrite;
     }
 

@@ -7,9 +7,6 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.UUID;
 
-/**
- * Created by niki on 05/01/17.
- */
 public abstract class Client {
     private Selector clientSelector = null;
     private SocketChannel clientSocketChannel = null;

@@ -2,9 +2,6 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * Created by niki on 09/01/17.
- */
 public class PublisherMessageGenerator extends MessageGenerator {
     private final List<ClientMessageKey> messageTypes = Arrays.asList(ClientMessageKey.PUBLISH, ClientMessageKey.PINGREQ, ClientMessageKey.DISCONNECT);
     private String clientId;

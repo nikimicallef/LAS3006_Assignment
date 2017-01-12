@@ -2,9 +2,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Created by niki on 09/01/17.
- */
+
 public class MessageGeneratorThreading {
     private final ScheduledExecutorService scheduledExecutorService;
     private final MessageGenerator messageGenerator;

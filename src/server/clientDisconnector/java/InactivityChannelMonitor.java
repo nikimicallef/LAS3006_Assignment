@@ -1,14 +1,12 @@
-import org.w3c.dom.css.Counter;
-
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 import java.nio.channels.SelectionKey;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Created by niki on 10/01/17.
- */
 public class InactivityChannelMonitor implements Runnable, InactivityTimeSeconds {
     private final Map<SelectionKey, Long> lastSelectionKeyActivityTime = new ConcurrentHashMap<>();
     volatile int inactivityTimeSeconds = 5;
@@ -29,7 +27,7 @@ public class InactivityChannelMonitor implements Runnable, InactivityTimeSeconds
         return pollingRateSeconds;
     }
 
-    public synchronized List<SelectionKey> getKeysToInvalidate() {
+    public List<SelectionKey> getKeysToInvalidate() {
         return keysToInvalidate;
     }
 
@@ -37,7 +35,7 @@ public class InactivityChannelMonitor implements Runnable, InactivityTimeSeconds
         this.keysToInvalidate = keysToInvalidate;
     }
 
-    public synchronized Map<SelectionKey, Long> getLastSelectionKeyActivityTime() {
+    public Map<SelectionKey, Long> getLastSelectionKeyActivityTime() {
         return lastSelectionKeyActivityTime;
     }
 
@@ -52,7 +50,7 @@ public class InactivityChannelMonitor implements Runnable, InactivityTimeSeconds
     }
 
     @Override
-    public synchronized void setInactivityTime(final int inactivityTime){
+    public void setInactivityTime(final int inactivityTime){
         this.inactivityTimeSeconds = inactivityTime;
     }
 
