@@ -1,6 +1,6 @@
 package server;
 
-import clientdisconnector.InactivityChannelMonitor;
+import clientdisconnector.InactivityChannelMonitorMbean;
 import clientdisconnector.InactivityChannelMonitorThreading;
 import properties.GlobalProperties;
 import resources.*;
@@ -63,12 +63,10 @@ public class Server implements ServerMbean {
         return noOfMessagesPublishedByEachClient;
     }
 
-    public Server(final boolean initialiseServer) {
-        if (initialiseServer) {
-            init();
-        }
+    public Server() {
+        init();
 
-        inactivityChannelMonitorThreading = new InactivityChannelMonitorThreading(new InactivityChannelMonitor());
+        inactivityChannelMonitorThreading = new InactivityChannelMonitorThreading(new InactivityChannelMonitorMbean());
     }
 
     private void init() {
@@ -187,7 +185,7 @@ public class Server implements ServerMbean {
 
                 prepareAckMessage(ServerMessageKey.PUBACK, selectionKey);
 
-                final List<String> validPaths = listOfSubscribers.keySet().stream().filter(path -> pathsMatch(deserializedClientMessage.getPath(), path)).collect(Collectors.toList());
+                final List<String> validPaths = listOfSubscribers.keySet().stream().filter(path -> PathParsing.pathsMatch(deserializedClientMessage.getPath(), path)).collect(Collectors.toList());
 
                 validPaths.forEach(path -> {
                     final List<SelectionKey> selectionKeys = listOfSubscribers.get(path);
@@ -201,7 +199,7 @@ public class Server implements ServerMbean {
             } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.SUBSCRIBE) {
                 System.out.println("Subscribe to Path: " + deserializedClientMessage.getPath());
 
-                final boolean pathValid = pathChecker(deserializedClientMessage.getPath());
+                final boolean pathValid = PathParsing.pathChecker(deserializedClientMessage.getPath());
 
                 if (pathValid) {
                     listOfSubscribers.putIfAbsent(deserializedClientMessage.getPath(), new ArrayList<>());
@@ -275,48 +273,6 @@ public class Server implements ServerMbean {
         selectionKey.cancel();
     }
 
-    public boolean pathsMatch(final String inputtedPath, final String pathInHashMap) {
-        final String[] inputtedPathSplit = inputtedPath.split("/");
-        final String[] pathInHashMapSplit = pathInHashMap.split("/");
-
-        for (int counter = 0; counter < pathInHashMapSplit.length; counter++) {
-            if (pathInHashMapSplit[counter].equals("#") || (inputtedPathSplit.length > counter && inputtedPathSplit[counter].equals("#"))) {
-                return true;
-            } else if (pathInHashMapSplit[counter].equals("+") || ((inputtedPathSplit.length > counter && inputtedPathSplit[counter].equals("+")))) {
-                continue;
-            } else if (inputtedPathSplit.length > counter && !pathInHashMapSplit[counter].equals(inputtedPathSplit[counter])) {
-                return false;
-            }
-        }
-
-        return inputtedPathSplit.length == pathInHashMapSplit.length;
-    }
-
-    public boolean pathChecker(final String path) {
-        final String[] pathLevels = path.split("/");
-
-        if (Arrays.stream(pathLevels).filter(level -> level.length() == 0).collect(Collectors.toList()).size() > 0) {
-            System.out.println("Path " + path + " invalid since once or more levels is empty");
-            return false;
-        } else if (path.charAt(0) == '/') {
-            System.out.println("Path " + path + " invalid since it starts with a /");
-            return false;
-        } else if (path.charAt(path.length() - 1) == '/') {
-            System.out.println("Path " + path + " invalid since it ends with a /.");
-            return false;
-        } else if (path.contains(" ")) {
-            System.out.println("Path " + path + " invalid since it contains a space.");
-            return false;
-        } else if (Arrays.stream(pathLevels).filter(level -> level.length() > 1 && (level.contains("+") || level.contains("#"))).collect(Collectors.toList()).size() > 0) {
-            System.out.println("Path " + path + " invalid since it contains a + or a # within a level");
-            return false;
-        } else if (Arrays.stream(pathLevels).filter(level -> !(pathLevels[pathLevels.length - 1].equals(level))).filter(item -> item.contains("#")).collect(Collectors.toList()).size() > 0) {
-            System.out.println("Path " + path + " invalid since the wildcard # can only be used at the end.");
-            return false;
-        }
-        return true;
-    }
-
     private void prepareAckMessage(final ServerMessageKey serverMessageKey, final SelectionKey selectionKey, final boolean... status) {
         if (serverMessageKey == ServerMessageKey.UNSUBACK) {
             messagesToSend.add(new Pair<>(selectionKey, new ServerCustomMessage(serverMessageKey, "Ack of type " + serverMessageKey, status[0])));
@@ -338,7 +294,7 @@ public class Server implements ServerMbean {
     }
 
     public static void main(String[] args) throws IOException, ClassNotFoundException, MalformedObjectNameException, NotCompliantMBeanException, InstanceAlreadyExistsException, MBeanRegistrationException {
-        final Server server = new Server(true);
+        final Server server = new Server();
 
         final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
         mbs.registerMBean(server.inactivityChannelMonitorThreading.getInactivityChannelMonitor(), server.inactivityChannelMonitorThreading.getInactivityChannelMonitor().getObjectName());

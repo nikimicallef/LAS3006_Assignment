@@ -6,15 +6,15 @@ import java.util.concurrent.TimeUnit;
 
 public class InactivityChannelMonitorThreading {
     private final ScheduledExecutorService scheduledExecutorService;
-    private final InactivityChannelMonitor inactivityChannelMonitor;
+    private final InactivityChannelMonitorMbean inactivityChannelMonitor;
 
-    public InactivityChannelMonitorThreading(final InactivityChannelMonitor inactivityChannelMonitor) {
+    public InactivityChannelMonitorThreading(final InactivityChannelMonitorMbean inactivityChannelMonitor) {
         this.inactivityChannelMonitor = inactivityChannelMonitor;
         scheduledExecutorService = new ScheduledThreadPoolExecutor(1);
         scheduledExecutorService.scheduleWithFixedDelay(inactivityChannelMonitor, 0, inactivityChannelMonitor.getPollingRateSeconds(), TimeUnit.SECONDS);
     }
 
-    public InactivityChannelMonitor getInactivityChannelMonitor() {
+    public InactivityChannelMonitorMbean getInactivityChannelMonitor() {
         return inactivityChannelMonitor;
     }
 

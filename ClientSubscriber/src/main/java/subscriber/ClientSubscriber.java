@@ -3,7 +3,9 @@ package subscriber;
 import properties.GlobalProperties;
 import resources.*;
 
+import javax.management.*;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 
@@ -54,11 +56,25 @@ public class ClientSubscriber extends Client {
 
     public static void main(String[] args) {
         final ClientSubscriber clientSubscriber = new ClientSubscriber();
-        clientSubscriber.setMessageGenerator(new SubscriberMessageGenerator(clientSubscriber.getClientId()));
+
+        if (args.length > 0) {
+            if (PathParsing.pathChecker(args[0])) {
+                clientSubscriber.setMessageGenerator(new SubscriberMessageGenerator(clientSubscriber.getClientId(), args[0]));
+                System.out.println("Client will be using path " + args[0]);
+            } else {
+                System.out.println("Inputted path is not valid. Starting without hardcoded path.");
+                clientSubscriber.setMessageGenerator(new SubscriberMessageGenerator(clientSubscriber.getClientId()));
+            }
+        } else {
+            clientSubscriber.setMessageGenerator(new SubscriberMessageGenerator(clientSubscriber.getClientId()));
+            System.out.println("Client will be generating a path.");
+        }
 
         try {
+            final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+            mbs.registerMBean(clientSubscriber.getMessageGeneratorThreading().getMessageGenerator(), clientSubscriber.getMessageGeneratorThreading().getMessageGenerator().getObjectName());
             clientSubscriber.connectionManager();
-        } catch (IOException e) {
+        } catch (IOException | MalformedObjectNameException | NotCompliantMBeanException | InstanceAlreadyExistsException | MBeanRegistrationException e) {
             e.printStackTrace();
             clientSubscriber.getMessageGeneratorThreading().shutdown();
         }
