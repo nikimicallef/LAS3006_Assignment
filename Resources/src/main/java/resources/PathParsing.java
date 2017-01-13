@@ -4,7 +4,10 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 public class PathParsing {
-    public static boolean pathChecker(final String path) {
+    public static boolean pathChecker(String path) {
+        if(path.contains("\\")){
+            path = path.replace("\\","/");
+        }
         final String[] pathLevels = path.split("/");
 
         if (Arrays.stream(pathLevels).filter(level -> level.length() == 0).collect(Collectors.toList()).size() > 0) {
