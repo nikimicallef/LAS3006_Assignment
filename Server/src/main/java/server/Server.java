@@ -59,7 +59,7 @@ public class Server implements ServerMbean {
     }
 
     @Override
-    public Map<String, Integer> noOfMessagesPublishedByEachClient() {
+    public Map<String, Integer> getNoOfMessagesPublishedByEachClient() {
         return noOfMessagesPublishedByEachClient;
     }
 
@@ -178,7 +178,7 @@ public class Server implements ServerMbean {
             ClientCustomMessage deserializedClientMessage = (ClientCustomMessage) GlobalProperties.deserializeMessage(buffer.array());
 
             noOfMessagesDeliveredToEachClient.putIfAbsent(deserializedClientMessage.getClientId(), 0);
-            noOfMessagesPublishedByEachClient().put(deserializedClientMessage.getClientId(), noOfMessagesDeliveredToEachClient.get(deserializedClientMessage.getClientId() + 1));
+            noOfMessagesPublishedByEachClient.put(deserializedClientMessage.getClientId(), noOfMessagesDeliveredToEachClient.get(deserializedClientMessage.getClientId() + 1));
 
             if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PUBLISH) {
                 System.out.println("Data read: " + deserializedClientMessage.getMessage());

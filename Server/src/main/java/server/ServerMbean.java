@@ -16,5 +16,5 @@ public interface ServerMbean {
 
     Map<String, Integer> getNoOfMessagesDeliveredToEachClient();
 
-    Map<String, Integer> noOfMessagesPublishedByEachClient();
+    Map<String, Integer> getNoOfMessagesPublishedByEachClient();
 }
