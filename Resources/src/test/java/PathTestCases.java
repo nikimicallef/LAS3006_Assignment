@@ -205,6 +205,11 @@ public class PathTestCases {
     }
 
     @Test
+    public void invalidPath14() {
+        Assert.assertEquals(false, pathChecker("#/#"));
+    }
+
+    @Test
     public void validPath1() {
         Assert.assertEquals(true, pathChecker("a"));
     }
@@ -242,5 +247,10 @@ public class PathTestCases {
     @Test
     public void validPath8() {
         Assert.assertEquals(true, pathChecker("+"));
+    }
+
+    @Test
+    public void validPath9() {
+        Assert.assertEquals(true, pathChecker("home\\kitchen"));
     }
 }

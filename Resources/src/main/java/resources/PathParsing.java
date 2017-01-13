@@ -5,8 +5,8 @@ import java.util.stream.Collectors;
 
 public class PathParsing {
     public static boolean pathChecker(String path) {
-        if(path.contains("\\")){
-            path = path.replace("\\","/");
+        if (path.contains("\\")) {
+            path = path.replace("\\", "/");
         }
         final String[] pathLevels = path.split("/");
 
@@ -25,6 +25,8 @@ public class PathParsing {
         } else if (Arrays.stream(pathLevels).filter(level -> level.length() > 1 && (level.contains("+") || level.contains("#"))).collect(Collectors.toList()).size() > 0) {
             System.out.println("Path " + path + " invalid since it contains a + or a # within a level");
             return false;
+        } else if (Arrays.stream(pathLevels).filter(level -> level.equalsIgnoreCase("#")).collect(Collectors.toList()).size() > 1) {
+            System.out.println("Path " + path + " contains more than one #.");
         } else if (Arrays.stream(pathLevels).filter(level -> !(pathLevels[pathLevels.length - 1].equals(level))).filter(item -> item.contains("#")).collect(Collectors.toList()).size() > 0) {
             System.out.println("Path " + path + " invalid since the wildcard # can only be used at the end.");
             return false;
