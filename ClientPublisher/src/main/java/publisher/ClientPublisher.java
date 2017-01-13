@@ -1,6 +1,5 @@
 package publisher;
 
-import properties.GlobalProperties;
 import resources.Client;
 import resources.PathParsing;
 import resources.ServerCustomMessage;
@@ -10,6 +9,8 @@ import javax.management.*;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
+
+import static resources.CustomSerializer.deserializeMessage;
 
 public class ClientPublisher extends Client {
     ClientPublisher() {
@@ -26,7 +27,7 @@ public class ClientPublisher extends Client {
             throw new IllegalStateException("Failed to read!");
         }
 
-        final ServerCustomMessage deserializedServerMessage = (ServerCustomMessage) GlobalProperties.deserializeMessage(buffer.array());
+        final ServerCustomMessage deserializedServerMessage = (ServerCustomMessage) deserializeMessage(buffer.array());
         if (deserializedServerMessage.getServerMessageKey() == ServerMessageKey.PUBACK) {
             System.out.println(deserializedServerMessage.getMessage());
         } else if (deserializedServerMessage.getServerMessageKey() == ServerMessageKey.CONNACK) {
@@ -59,7 +60,7 @@ public class ClientPublisher extends Client {
             final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
             mbs.registerMBean(clientPublisher.getMessageGeneratorThreading().getMessageGenerator(), clientPublisher.getMessageGeneratorThreading().getMessageGenerator().getObjectName());
             clientPublisher.connectionManager();
-        }  catch (IOException | MalformedObjectNameException | NotCompliantMBeanException | InstanceAlreadyExistsException | MBeanRegistrationException e) {
+        } catch (IOException | MalformedObjectNameException | NotCompliantMBeanException | InstanceAlreadyExistsException | MBeanRegistrationException e) {
             e.printStackTrace();
             clientPublisher.getMessageGeneratorThreading().shutdown();
         }

@@ -1,6 +1,6 @@
 package server;
 
-import clientdisconnector.InactivityChannelMonitorMbean;
+import clientdisconnector.InactivityChannelMonitor;
 import clientdisconnector.InactivityChannelMonitorThreading;
 import properties.GlobalProperties;
 import resources.*;
@@ -16,6 +16,9 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static resources.CustomSerializer.deserializeMessage;
+import static resources.CustomSerializer.serializeMessage;
 
 public class Server implements ServerMbean {
     private Selector serverSelector = null;
@@ -66,7 +69,7 @@ public class Server implements ServerMbean {
     public Server() {
         init();
 
-        inactivityChannelMonitorThreading = new InactivityChannelMonitorThreading(new InactivityChannelMonitorMbean());
+        inactivityChannelMonitorThreading = new InactivityChannelMonitorThreading(new InactivityChannelMonitor());
     }
 
     private void init() {
@@ -153,7 +156,7 @@ public class Server implements ServerMbean {
             System.out.println("Writing message " + messageToSend.getSecond().getMessage() + " to selection key " + messageToSend.getFirst().channel().toString());
             final byte[] serializedMessage;
             try {
-                serializedMessage = GlobalProperties.serializeMessage(messageToSend.getSecond());
+                serializedMessage = serializeMessage(messageToSend.getSecond());
                 messagesToRemove.add(messageToSend);
                 socketChannel.write(ByteBuffer.wrap(serializedMessage));
                 totalMessagesDelivered++;
@@ -169,31 +172,37 @@ public class Server implements ServerMbean {
         selectionKey.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
     }
 
+
     private void read(final SelectionKey selectionKey) throws IOException, ClassNotFoundException {
         final SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
         final ByteBuffer buffer = ByteBuffer.allocate(1024);
 
         try {
             socketChannel.read(buffer);
-            ClientCustomMessage deserializedClientMessage = (ClientCustomMessage) GlobalProperties.deserializeMessage(buffer.array());
+            ClientCustomMessage deserializedClientMessage = (ClientCustomMessage) deserializeMessage(buffer.array());
 
             noOfMessagesDeliveredToEachClient.putIfAbsent(deserializedClientMessage.getClientId(), 0);
             noOfMessagesPublishedByEachClient.put(deserializedClientMessage.getClientId(), noOfMessagesDeliveredToEachClient.get(deserializedClientMessage.getClientId() + 1));
 
             if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PUBLISH) {
                 System.out.println("Data read: " + deserializedClientMessage.getMessage());
+                if(PathParsing.pathChecker(deserializedClientMessage.getPath())) {
+                    prepareAckMessage(ServerMessageKey.PUBACK, selectionKey);
 
-                prepareAckMessage(ServerMessageKey.PUBACK, selectionKey);
+                    final List<String> validPaths = listOfSubscribers.keySet().stream().filter(path -> PathParsing.pathsMatch(deserializedClientMessage.getPath(), path)).collect(Collectors.toList());
 
-                final List<String> validPaths = listOfSubscribers.keySet().stream().filter(path -> PathParsing.pathsMatch(deserializedClientMessage.getPath(), path)).collect(Collectors.toList());
-
-                validPaths.forEach(path -> {
-                    final List<SelectionKey> selectionKeys = listOfSubscribers.get(path);
-                    selectionKeys.forEach(selectionKey1 -> {
-                        preparePublishMessage(selectionKey1, deserializedClientMessage.getMessage());
-                        noOfMessagesDeliveredPerTopic.put(path, noOfMessagesDeliveredPerTopic.get(path) + 1);
+                    validPaths.forEach(path -> {
+                        final List<SelectionKey> selectionKeys = listOfSubscribers.get(path);
+                        selectionKeys.forEach(selectionKey1 -> {
+                            preparePublishMessage(selectionKey1, deserializedClientMessage.getMessage());
+                            noOfMessagesDeliveredPerTopic.put(path, noOfMessagesDeliveredPerTopic.get(path) + 1);
+                        });
                     });
-                });
+                } else {
+                    prepareAckMessage(ServerMessageKey.PUBACK, selectionKey);
+
+                    System.out.println("Path " + deserializedClientMessage.getPath() + " is not valid");
+                }
             } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.PUBREC) {
                 System.out.println("Pubrec received for " + deserializedClientMessage.getClientMessageKey().toString());
             } else if (deserializedClientMessage.getClientMessageKey() == ClientMessageKey.SUBSCRIBE) {
@@ -296,10 +305,17 @@ public class Server implements ServerMbean {
     public static void main(String[] args) throws IOException, ClassNotFoundException, MalformedObjectNameException, NotCompliantMBeanException, InstanceAlreadyExistsException, MBeanRegistrationException {
         final Server server = new Server();
 
+        System.out.println("Server started.");
+
         final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
         mbs.registerMBean(server.inactivityChannelMonitorThreading.getInactivityChannelMonitor(), server.inactivityChannelMonitorThreading.getInactivityChannelMonitor().getObjectName());
         mbs.registerMBean(server, server.getObjectName());
 
-        server.connectionManager();
+        try {
+            server.connectionManager();
+        }catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+            server.inactivityChannelMonitorThreading.shutdown();
+        }
     }
 }

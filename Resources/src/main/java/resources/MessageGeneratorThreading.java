@@ -12,7 +12,7 @@ public class MessageGeneratorThreading {
     public MessageGeneratorThreading(final MessageGenerator messageGenerator) {
         this.messageGenerator = messageGenerator;
         scheduledExecutorService = new ScheduledThreadPoolExecutor(1);
-        scheduledExecutorService.scheduleWithFixedDelay(messageGenerator, 0, messageGenerator.getPollingRateSeconds(), TimeUnit.SECONDS);
+        scheduledExecutorService.scheduleWithFixedDelay(messageGenerator, 1, messageGenerator.getPollingRateSeconds(), TimeUnit.SECONDS);
     }
 
     public MessageGenerator getMessageGenerator() {

@@ -24,7 +24,8 @@ public class SubscriberMessageGenerator extends MessageGenerator {
         this.clientId=clientId;
     }
 
-    public String generateSubscribePath() {
+    @Override
+    public String generatePath() {
         String path = "";
 
         String levelPath = topLevelPath.get(secureRandom.nextInt(topLevelPath.size()));
@@ -52,14 +53,14 @@ public class SubscriberMessageGenerator extends MessageGenerator {
     }
 
     @Override
-    public ClientCustomMessage generate() {
+    public ClientCustomMessage generateMessage() {
         final ClientMessageKey clientMessageKey = messageTypes.get(secureRandom.nextInt(messageTypes.size()));
         final String thisPath;
 
         if(getHardcodedPath() != null && PathParsing.pathChecker(getHardcodedPath())){
             thisPath = getHardcodedPath();
         } else {
-            thisPath = generateSubscribePath();
+            thisPath = generatePath();
         }
 
         if (clientMessageKey == ClientMessageKey.SUBSCRIBE) {
@@ -72,7 +73,7 @@ public class SubscriberMessageGenerator extends MessageGenerator {
         if (secureRandom.nextInt(10) == 0) {
             return new ClientCustomMessage(ClientMessageKey.DISCONNECT);
         } else {
-            return generate();
+            return generateMessage();
         }
     }
 }

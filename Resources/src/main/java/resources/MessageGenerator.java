@@ -12,10 +12,10 @@ public abstract class MessageGenerator implements Runnable, MessageGeneratorMbea
     final int pollingRateSeconds = 1;
     public final List<String> topLevelPath = Arrays.asList("bedroom", "bathroom", "#", "+");
     public final List<String> midLevelPath = Arrays.asList("aircondition", "boiler", "#", "+");
-    public final List<String> bottomLevelPath = Arrays.asList("temperature", "#", "+");
+    public final List<String> bottomLevelPath = Arrays.asList("temperature", "status", "#", "+");
     public final SecureRandom secureRandom = new SecureRandom();
     final List<ClientCustomMessage> messagesToWrite = Collections.synchronizedList(new ArrayList<>());
-    private String hardcodedPath = null;
+    private volatile String hardcodedPath = null;
 
     public MessageGenerator() {
     }
@@ -32,7 +32,9 @@ public abstract class MessageGenerator implements Runnable, MessageGeneratorMbea
         return messagesToWrite;
     }
 
-    public abstract ClientCustomMessage generate();
+    public abstract ClientCustomMessage generateMessage();
+
+    public abstract String generatePath();
 
     @Override
     public String getHardcodedPath() {
@@ -51,7 +53,7 @@ public abstract class MessageGenerator implements Runnable, MessageGeneratorMbea
     @Override
     public void run() {
         synchronized (messagesToWrite) {
-            messagesToWrite.add(generate());
+            messagesToWrite.add(generateMessage());
         }
     }
 }

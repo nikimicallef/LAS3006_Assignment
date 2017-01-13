@@ -11,6 +11,8 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.UUID;
 
+import static resources.CustomSerializer.serializeMessage;
+
 public abstract class Client {
     private Selector clientSelector = null;
     private SocketChannel clientSocketChannel = null;
@@ -146,7 +148,7 @@ public abstract class Client {
                         messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().remove(0);
                     } else {
                         System.out.println("Writing msg of type " + messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().get(0).getClientMessageKey());
-                        final byte[] serializedMessage = GlobalProperties.serializeMessage(messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().get(0));
+                        final byte[] serializedMessage = serializeMessage(messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().get(0));
                         messageGeneratorThreading.getMessageGenerator().getMessagesToWrite().remove(0);
                         clientSocketChannel.write(ByteBuffer.wrap(serializedMessage));
                     }

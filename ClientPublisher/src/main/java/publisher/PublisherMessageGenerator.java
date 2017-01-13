@@ -23,7 +23,8 @@ public class PublisherMessageGenerator extends resources.MessageGenerator implem
         this.clientId = clientId;
     }
 
-    public String generatePublishPath() {
+    @Override
+    public String generatePath() {
         String path = "";
         final int pathMaxLength = secureRandom.nextInt(3) + 1;
 
@@ -67,14 +68,14 @@ public class PublisherMessageGenerator extends resources.MessageGenerator implem
     }
 
     @Override
-    public ClientCustomMessage generate() {
+    public ClientCustomMessage generateMessage() {
         final ClientMessageKey clientMessageKey = messageTypes.get(secureRandom.nextInt(messageTypes.size()));
         final String thisPath;
 
         if(getHardcodedPath() != null && PathParsing.pathChecker(getHardcodedPath())){
             thisPath = getHardcodedPath();
         } else {
-            thisPath = generatePublishPath();
+            thisPath = generatePath();
         }
 
         if (clientMessageKey == ClientMessageKey.PUBLISH) {
@@ -85,7 +86,7 @@ public class PublisherMessageGenerator extends resources.MessageGenerator implem
         if (secureRandom.nextInt(10) == 0) {
             return new ClientCustomMessage(ClientMessageKey.DISCONNECT);
         } else {
-            return generate();
+            return generateMessage();
         }
     }
 }

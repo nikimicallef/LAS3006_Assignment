@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InactivityChannelMonitorMbean implements Runnable, InactivityTimeSecondsMbean {
+public class InactivityChannelMonitor implements Runnable, InactivityTimeSecondsMbean {
     private final Map<SelectionKey, Long> lastSelectionKeyActivityTime = new ConcurrentHashMap<>();
     volatile int inactivityTimeSeconds = 5;
     private List<SelectionKey> keysToInvalidate = Collections.synchronizedList(new ArrayList<>());

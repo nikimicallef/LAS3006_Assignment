@@ -1,6 +1,5 @@
 package subscriber;
 
-import properties.GlobalProperties;
 import resources.*;
 
 import javax.management.*;
@@ -8,6 +7,8 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
+
+import static resources.CustomSerializer.deserializeMessage;
 
 public class ClientSubscriber extends Client {
     ClientSubscriber() {
@@ -19,7 +20,7 @@ public class ClientSubscriber extends Client {
         final ServerCustomMessage deserializedServerMessage;
 
         getClientSocketChannel().read(buffer);
-        deserializedServerMessage = (ServerCustomMessage) GlobalProperties.deserializeMessage(buffer.array());
+        deserializedServerMessage = (ServerCustomMessage) deserializeMessage(buffer.array());
 
 
         if (deserializedServerMessage.getServerMessageKey() == ServerMessageKey.SUBACK) {
